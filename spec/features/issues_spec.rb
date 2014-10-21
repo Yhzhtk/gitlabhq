@@ -59,9 +59,9 @@ describe "Issues", feature: true do
 
       page.should have_content "Assign to #{@user.name}"
 
-      page.first('#s2id_issue_assignee_id').click
+      first('#s2id_issue_assignee_id').click
       sleep 2 # wait for ajax stuff to complete
-      page.first('.user-result').click
+      first('.user-result').click
 
       click_button "Save changes"
 
@@ -212,7 +212,7 @@ describe "Issues", feature: true do
         click_button 'Update Issue'
 
         page.should have_content "Assignee:"
-        page.has_select?('issue_assignee_id', :selected => project.team.members.first.name)
+        has_select?('issue_assignee_id', :selected => project.team.members.first.name)
       end
     end
 
@@ -226,7 +226,7 @@ describe "Issues", feature: true do
         issue.save
       end
 
-      it 'shows assignee text' do
+      it "shows assignee text", js: true do
         logout
         login_with guest
 
@@ -248,8 +248,8 @@ describe "Issues", feature: true do
         find('.edit-issue.inline-update').select(milestone.title, from: 'issue_milestone_id')
         click_button 'Update Issue'
 
-        page.should have_content "Milestone"
-        page.has_select?('issue_assignee_id', :selected => milestone.title)
+        page.should have_content "Milestone changed to #{milestone.title}"
+        has_select?('issue_assignee_id', :selected => milestone.title)
       end
     end
 
@@ -262,7 +262,7 @@ describe "Issues", feature: true do
         issue.save
       end
 
-      it 'shows milestone text' do
+      it "shows milestone text", js: true do
         logout
         login_with guest
 
@@ -283,9 +283,9 @@ describe "Issues", feature: true do
         visit project_issue_path(project, issue)
         page.should have_content "Assignee: #{user2.name}"
 
-        page.first('#s2id_issue_assignee_id').click
+        first('#s2id_issue_assignee_id').click
         sleep 2 # wait for ajax stuff to complete
-        page.first('.user-result').click
+        first('.user-result').click
 
         page.should have_content "Assignee: Unassigned"
         sleep 2 # wait for ajax stuff to complete

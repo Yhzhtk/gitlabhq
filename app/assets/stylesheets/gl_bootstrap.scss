@@ -7,8 +7,9 @@
  */
 
 $font-size-base: 13px !default;
-$nav-pills-active-link-hover-bg: $bg_style_color;
-$pagination-active-bg: $bg_style_color;
+$nav-pills-active-link-hover-bg: $bg_primary;
+$pagination-active-bg: $bg_primary;
+$list-group-active-bg: $bg_primary;
 
 // Core variables and mixins
 @import "bootstrap/variables";
@@ -113,8 +114,7 @@ $pagination-active-bg: $bg_style_color;
 
   li {
     > a {
-      padding: 8px 20px;
-      margin-right: 7px;
+      margin-right: 5px;
       line-height: 20px;
       border-color: #EEE;
       color: #888;
@@ -124,7 +124,7 @@ $pagination-active-bg: $bg_style_color;
         color: #888;
         text-shadow: 0 1px 1px #fff;
       }
-      i[class^="icon-"] {
+      i[class~="fa"] {
         line-height: 14px;
       }
     }
@@ -199,20 +199,6 @@ $pagination-active-bg: $bg_style_color;
   color: #3c763d;
 }
 
-// Breadcrumb
-ul.breadcrumb {
-  background: white;
-  border: none;
-  li {
-    display: inline;
-    text-shadow: 0 1px 0 white
-  }
-
-  a {
-    font-size: 16px;
-  }
-}
-
 /**
  * fix to keep tooltips position in top navigation bar
  *
@@ -220,4 +206,89 @@ ul.breadcrumb {
 .navbar .nav > li {
   position: relative;
   white-space: nowrap;
+}
+
+/**
+ * Add some extra stuff to panels
+ *
+ */
+.panel {
+  @include border-radius(0px);
+
+  .panel-heading {
+    @include border-radius(0px);
+    font-size: 14px;
+    line-height: 18px;
+
+    .panel-head-actions {
+      position: relative;
+      top: -7px;
+      float: right;
+    }
+  }
+
+  .panel-body {
+    form {
+      margin: 0;
+    }
+
+    .form-actions {
+      margin: -15px;
+      margin-top: 18px;
+    }
+  }
+
+  .panel-footer {
+    .pagination {
+      margin: 0;
+    }
+  }
+
+  &.panel-small {
+    .panel-heading {
+      padding: 6px 15px;
+      font-size: 13px;
+      a {
+        color: #777;
+      }
+    }
+  }
+}
+
+.panel-default {
+  .panel-heading {
+    background-color: #EEE;
+  }
+}
+
+.panel-danger {
+  @include panel-colored;
+  .panel-heading {
+    color: $border_danger;
+    border-color: $border_danger;
+  }
+}
+
+.panel-success {
+  @include panel-colored;
+  .panel-heading {
+    color: $border_success;
+    border-color: $border_success;
+  }
+}
+
+.panel-primary {
+  @include panel-colored;
+  .panel-heading {
+    color: $border_primary;
+    border-color: $border_primary;
+  }
+}
+
+.panel-warning {
+  @include panel-colored;
+  .panel-heading {
+    color: $border_warning;
+    border-color: $border_warning;
+  }
 }

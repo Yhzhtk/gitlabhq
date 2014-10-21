@@ -12,34 +12,30 @@ class Commit
   # User can force display of diff above this size
   DIFF_SAFE_FILES  = 100
   DIFF_SAFE_LINES  = 5000
+
   # Commits above this size will not be rendered in HTML
-  DIFF_HARD_LIMIT_FILES = 500
-  DIFF_HARD_LIMIT_LINES = 10000
+  DIFF_HARD_LIMIT_FILES = 1000
+  DIFF_HARD_LIMIT_LINES = 50000
 
   class << self
     def decorate(commits)
-      commits.map { |c| self.new(c) }
+      commits.map do |commit|
+        if commit.kind_of?(Commit)
+          commit
+        else
+          self.new(commit)
+        end
+      end
     end
 
     # Calculate number of lines to render for diffs
     def diff_line_count(diffs)
-      diffs.reduce(0){|sum, d| sum + d.diff.lines.count}
+      diffs.reduce(0) { |sum, d| sum + d.diff.lines.count }
     end
 
-    def diff_suppress?(diffs, line_count = nil)
-      # optimize - check file count first
-      return true if diffs.size > DIFF_SAFE_FILES
-
-      line_count ||= Commit::diff_line_count(diffs)
-      line_count > DIFF_SAFE_LINES
-    end
-
-    def diff_force_suppress?(diffs, line_count = nil)
-      # optimize - check file count first
-      return true if diffs.size > DIFF_HARD_LIMIT_FILES
-
-      line_count ||= Commit::diff_line_count(diffs)
-      line_count > DIFF_HARD_LIMIT_LINES
+    # Truncate sha to 8 characters
+    def truncate_sha(sha)
+      sha[0..7]
     end
   end
 
@@ -58,14 +54,6 @@ class Commit
   def diff_line_count
     @diff_line_count ||= Commit::diff_line_count(self.diffs)
     @diff_line_count
-  end
-
-  def diff_suppress?
-    Commit::diff_suppress?(self.diffs, diff_line_count)
-  end
-
-  def diff_force_suppress?
-    Commit::diff_force_suppress?(self.diffs, diff_line_count)
   end
 
   # Returns a string describing the commit for use in a link title
@@ -111,27 +99,30 @@ class Commit
     description.present?
   end
 
-  # Regular expression that identifies commit message clauses that trigger issue closing.
-  def issue_closing_regex
-    @issue_closing_regex ||= Regexp.new(Gitlab.config.gitlab.issue_closing_pattern)
+  def hook_attrs(project)
+    path_with_namespace = project.path_with_namespace
+
+    {
+      id: id,
+      message: safe_message,
+      timestamp: committed_date.xmlschema,
+      url: "#{Gitlab.config.gitlab.url}/#{path_with_namespace}/commit/#{id}",
+      author: {
+        name: author_name,
+        email: author_email
+      }
+    }
   end
 
   # Discover issues should be closed when this commit is pushed to a project's
   # default branch.
-  def closes_issues project
-    md = issue_closing_regex.match(safe_message)
-    if md
-      extractor = Gitlab::ReferenceExtractor.new
-      extractor.analyze(md[0])
-      extractor.issues_for(project)
-    else
-      []
-    end
+  def closes_issues(project)
+    Gitlab::ClosingIssueExtractor.closed_by_message_in_project(safe_message, project)
   end
 
   # Mentionable override.
   def gfm_reference
-    "commit #{sha[0..5]}"
+    "commit #{id}"
   end
 
   def method_missing(m, *args, &block)
@@ -142,5 +133,14 @@ class Commit
     return true if @raw.respond_to?(method)
 
     super
+  end
+
+  # Truncate sha to 8 characters
+  def short_id
+    @raw.short_id(7)
+  end
+
+  def parents
+    @parents ||= Commit.decorate(super)
   end
 end

@@ -1,4 +1,4 @@
-class Project
+class @Project
   constructor: ->
     $('.project-edit-container').on 'ajax:before', =>
       $('.project-edit-container').hide()
@@ -24,9 +24,6 @@ class Project
       else
         $('#project_issues_tracker_id').removeAttr('disabled')
 
-
-@Project = Project
-
 $ ->
   # Git clone panel switcher
   scope = $ '.git-clone-holder'
@@ -46,3 +43,17 @@ $ ->
     $.cookie('hide_no_ssh_message', 'false', { path: path })
     $(@).parents('.no-ssh-key-message').hide()
     e.preventDefault()
+
+  $('.project-home-panel .star').on 'ajax:success', (e, data, status, xhr) ->
+    $(@).toggleClass('on').find('.count').html(data.star_count)
+  .on 'ajax:error', (e, xhr, status, error) ->
+    new Flash('Star toggle failed. Try again later.', 'alert')
+
+  $("a[data-toggle='tab']").on "shown.bs.tab", (e) ->
+      $.cookie "default_view", $(e.target).attr("href")
+
+    defaultView = $.cookie("default_view")
+    if defaultView
+      $("a[href=" + defaultView + "]").tab "show"
+    else
+      $("a[data-toggle='tab']:first").tab "show"

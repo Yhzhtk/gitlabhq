@@ -1,10 +1,12 @@
-class Notes
+class @Notes
   @interval: null
 
-  constructor: (notes_url, note_ids) ->
+  constructor: (notes_url, note_ids, last_fetched_at) ->
     @notes_url = notes_url
     @notes_url = gon.relative_url_root + @notes_url if gon.relative_url_root?
     @note_ids = note_ids
+    @last_fetched_at = last_fetched_at
+    @noteable_url = document.URL
     @initRefresh()
     @setupMainTargetNoteForm()
     @cleanBinding()
@@ -15,12 +17,18 @@ class Notes
     $(document).on "ajax:success", ".js-main-target-form", @addNote
     $(document).on "ajax:success", ".js-discussion-note-form", @addDiscussionNote
 
-        # change note in UI after update
+    # change note in UI after update
     $(document).on "ajax:success", "form.edit_note", @updateNote
 
     # Edit note link
     $(document).on "click", ".js-note-edit", @showEditForm
     $(document).on "click", ".note-edit-cancel", @cancelEdit
+
+    # Reopen and close actions for Issue/MR combined with note form submit
+    $(document).on "click", ".js-note-target-reopen", @targetReopen
+    $(document).on "click", ".js-note-target-close", @targetClose
+    $(document).on "click", ".js-comment-button", @updateCloseButton
+    $(document).on "keyup", ".js-note-text", @updateTargetButtons
 
     # remove a note (in general)
     $(document).on "click", ".js-note-delete", @removeNote
@@ -30,6 +38,9 @@ class Notes
 
     # Preview button
     $(document).on "click", ".js-note-preview-button", @previewNote
+
+    # Preview button
+    $(document).on "click", ".js-note-write-button", @writeNote
 
     # reset main target form after submit
     $(document).on "ajax:complete", ".js-main-target-form", @resetMainTargetForm
@@ -49,6 +60,15 @@ class Notes
     # hide diff note form
     $(document).on "click", ".js-close-discussion-note-form", @cancelDiscussionForm
 
+    # fetch notes when tab becomes visible
+    $(document).on "visibilitychange", @visibilityChange
+
+    @notes_forms = '.js-main-target-form textarea, .js-discussion-note-form textarea'
+    $(document).on('keypress', @notes_forms, (e)->
+      if e.keyCode == 10 || (e.ctrlKey && e.keyCode == 13)
+        $(@).parents('form').submit()
+    )
+
   cleanBinding: ->
     $(document).off "ajax:success", ".js-main-target-form"
     $(document).off "ajax:success", ".js-discussion-note-form"
@@ -58,11 +78,16 @@ class Notes
     $(document).off "click", ".js-note-delete"
     $(document).off "click", ".js-note-attachment-delete"
     $(document).off "click", ".js-note-preview-button"
+    $(document).off "click", ".js-note-write-button"
     $(document).off "ajax:complete", ".js-main-target-form"
     $(document).off "click", ".js-choose-note-attachment-button"
     $(document).off "click", ".js-discussion-reply-button"
     $(document).off "click", ".js-add-diff-note-button"
-
+    $(document).off "visibilitychange"
+    $(document).off "keypress", @notes_forms
+    $(document).off "keyup", ".js-note-text"
+    $(document).off "click", ".js-note-target-reopen"
+    $(document).off "click", ".js-note-target-close"
 
   initRefresh: ->
     clearInterval(Notes.interval)
@@ -71,14 +96,17 @@ class Notes
     , 15000
 
   refresh: ->
-    @getContent()
+    unless document.hidden or (@noteable_url != document.URL)
+      @getContent()
 
   getContent: ->
     $.ajax
       url: @notes_url
+      data: "last_fetched_at=" + @last_fetched_at
       dataType: "json"
       success: (data) =>
         notes = data.notes
+        @last_fetched_at = data.last_fetched_at
         $.each notes, (i, note) =>
           @renderNote(note)
 
@@ -124,22 +152,49 @@ class Notes
       # remove the note (will be added again below)
       row.next().find(".note").remove()
 
-    # append new note to all matching discussions
-    $(".notes[rel='" + note.discussion_id + "']").append note.html
+      # Add note to 'Changes' page discussions
+      $(".notes[rel='" + note.discussion_id + "']").append note.html
+
+      # Init discussion on 'Discussion' page if it is merge request page
+      if $('body').attr('data-page').indexOf('projects:merge_request') == 0
+        $('ul.main-notes-list').append(note.discussion_with_diff_html)
+    else
+      # append new note to all matching discussions
+      $(".notes[rel='" + note.discussion_id + "']").append note.html
 
     # cleanup after successfully creating a diff/discussion note
     @removeDiscussionNoteForm(form)
 
   ###
+  Shows write note textarea.
+  ###
+  writeNote: (e) ->
+    e.preventDefault()
+    form = $(this).closest("form")
+    # toggle tabs
+    form.find(".js-note-write-button").parent().addClass "active"
+    form.find(".js-note-preview-button").parent().removeClass "active"
+
+    # toggle content
+    form.find(".note-write-holder").show()
+    form.find(".note-preview-holder").hide()
+
+  ###
   Shows the note preview.
 
   Lets the server render GFM into Html and displays it.
-
-  Note: uses the Toggler behavior to toggle preview/edit views/buttons
   ###
   previewNote: (e) ->
     e.preventDefault()
     form = $(this).closest("form")
+    # toggle tabs
+    form.find(".js-note-write-button").parent().removeClass "active"
+    form.find(".js-note-preview-button").parent().addClass "active"
+
+    # toggle content
+    form.find(".note-write-holder").hide()
+    form.find(".note-preview-holder").show()
+
     preview = form.find(".js-note-preview")
     noteText = form.find(".js-note-text").val()
     if noteText.trim().length is 0
@@ -165,8 +220,7 @@ class Notes
     form.find(".js-errors").remove()
 
     # reset text and preview
-    previewContainer = form.find(".js-toggler-container.note_text_and_preview")
-    previewContainer.removeClass "on"  if previewContainer.is(".on")
+    form.find(".js-note-write-button").click()
     form.find(".js-note-text").val("").trigger "input"
 
   ###
@@ -216,7 +270,7 @@ class Notes
     form.removeClass "js-new-note-form"
 
     # setup preview buttons
-    form.find(".js-note-edit-button, .js-note-preview-button").tooltip placement: "left"
+    form.find(".js-note-write-button, .js-note-preview-button").tooltip placement: "left"
     previewButton = form.find(".js-note-preview-button")
     form.find(".js-note-text").on "input", ->
       if $(this).val().trim() isnt ""
@@ -277,7 +331,9 @@ class Notes
     GitLab.GfmAutoComplete.setup()
     form = note.find(".note-edit-form")
     form.show()
-    form.find("textarea").focus()
+    textarea = form.find("textarea")
+    textarea.focus()
+    disableButtonIfEmptyField textarea, form.find(".js-comment-button")
 
   ###
   Called in response to clicking the edit note link
@@ -332,7 +388,7 @@ class Notes
   ###
   replyToDiscussionNote: (e) =>
     form = $(".js-new-note-form")
-    replyLink = $(e.target)
+    replyLink = $(e.target).closest(".js-discussion-reply-button")
     replyLink.hide()
 
     # insert the form after the button
@@ -359,30 +415,6 @@ class Notes
     @setupNoteForm form
     form.find(".js-note-text").focus()
     form.addClass "js-discussion-note-form"
-
-  ###
-  General note form setup.
-
-  deactivates the submit button when text is empty
-  hides the preview button when text is empty
-  setup GFM auto complete
-  show the form
-  ###
-  setupNoteForm: (form) =>
-    disableButtonIfEmptyField form.find(".js-note-text"), form.find(".js-comment-button")
-    form.removeClass "js-new-note-form"
-    form.removeClass "js-new-note-form"
-    GitLab.GfmAutoComplete.setup()
-
-    # setup preview buttons
-    previewButton = form.find(".js-note-preview-button")
-    form.find(".js-note-text").on "input", ->
-      if $(this).val().trim() isnt ""
-        previewButton.removeClass("turn-off").addClass "turn-on"
-      else
-        previewButton.removeClass("turn-on").addClass "turn-off"
-
-    form.show()
 
   ###
   Called when clicking on the "add a comment" button on the side of a diff line.
@@ -450,4 +482,35 @@ class Notes
     filename = $(this).val().replace(/^.*[\\\/]/, "")
     form.find(".js-attachment-filename").text filename
 
-@Notes = Notes
+  ###
+  Called when the tab visibility changes
+  ###
+  visibilityChange: =>
+    @refresh()
+
+  targetReopen: (e) =>
+    @submitNoteForm($(e.target).parents('form'))
+
+  targetClose: (e) =>
+    @submitNoteForm($(e.target).parents('form'))
+
+  submitNoteForm: (form) =>
+    noteText = form.find(".js-note-text").val()
+    if noteText.trim().length > 0
+      form.submit()
+
+  updateCloseButton: (e) =>
+    textarea = $(e.target)
+    form = textarea.parents('form')
+    form.find('.js-note-target-close').text('Close')
+
+  updateTargetButtons: (e) =>
+    textarea = $(e.target)
+    form = textarea.parents('form')
+
+    if textarea.val().trim().length > 0
+      form.find('.js-note-target-reopen').text('Comment & reopen')
+      form.find('.js-note-target-close').text('Comment & close')
+    else
+      form.find('.js-note-target-reopen').text('Reopen')
+      form.find('.js-note-target-close').text('Close')

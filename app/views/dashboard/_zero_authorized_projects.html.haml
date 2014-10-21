@@ -1,9 +1,9 @@
 %h3.page-title Welcome to GitLab!
-%p.light Self Hosted Git Management application.
+%p.light Self hosted Git management application.
 %hr
 %div
   .dashboard-intro-icon
-    %i.icon-bookmark-empty
+    %i.fa.fa-bookmark-o
   %div
     %p.slead
       You don't have access to any projects right now.
@@ -11,9 +11,8 @@
       - if current_user.can_create_project?
         You can create up to
         %strong= pluralize(current_user.projects_limit, "project") + "."
-        Click on the button below to add a new one
       - else
-        If you are added to a project, it will be displayed here
+        If you are added to a project, it will be displayed here.
 
     - if current_user.can_create_project?
       .link_holder
@@ -24,12 +23,12 @@
   %hr
   %div
     .dashboard-intro-icon
-      %i.icon-group
+      %i.fa.fa-users
     %div
       %p.slead
         You can create a group for several dependent projects.
         %br
-        Groups are the best way to manage projects and members
+        Groups are the best way to manage projects and members.
       .link_holder
         = link_to new_group_path, class: "btn btn-new" do
           New group »
@@ -38,7 +37,7 @@
   %hr
   %div
     .dashboard-intro-icon
-      %i.icon-globe
+      %i.fa.fa-globe
     %div
       %p.slead
         There are
@@ -47,5 +46,5 @@
         %br
         Public projects are an easy way to allow everyone to have read-only access.
       .link_holder
-        = link_to public_projects_path, class: "btn btn-new" do
+        = link_to trending_explore_projects_path, class: "btn btn-new" do
           Browse public projects »

@@ -61,12 +61,16 @@ class WikiPage
 
   # The raw content of this page.
   def content
-    @attributes[:content]
+    @attributes[:content] ||= if @page
+                                @page.raw_data
+                              end
   end
 
   # The processed/formatted content of this page.
   def formatted_content
-    @attributes[:formatted_content]
+    @attributes[:formatted_content] ||= if @page
+                                          @page.formatted_data
+                                        end
   end
 
   # The markup format for the page.
@@ -83,14 +87,14 @@ class WikiPage
   def version
     return nil unless persisted?
 
-    @version ||= Commit.new(Gitlab::Git::Commit.new(@page.version))
+    @version ||= @page.version
   end
 
   # Returns an array of Gitlab Commit instances.
   def versions
     return [] unless persisted?
 
-    @page.versions.map { |v| Commit.new(Gitlab::Git::Commit.new(v)) }
+    @page.versions
   end
 
   def commit
@@ -167,20 +171,28 @@ class WikiPage
   def set_attributes
     attributes[:slug] = @page.escaped_url_path
     attributes[:title] = @page.title
-    attributes[:content] = @page.raw_data
-    attributes[:formatted_content] = @page.formatted_data
     attributes[:format] = @page.format
   end
 
   def save(method, *args)
-    if valid? && wiki.send(method, *args)
-      @page = wiki.wiki.paged(title)
+    project_wiki = wiki
+    if valid? && project_wiki.send(method, *args)
+
+      page_details = if method == :update_page
+                       @page.path
+                     else
+                       title
+                     end
+
+      page_title, page_dir = project_wiki.page_title_and_dir(page_details)
+      gollum_wiki = project_wiki.wiki
+      @page = gollum_wiki.paged(page_title, page_dir)
 
       set_attributes
 
       @persisted = true
     else
-      errors.add(:base, wiki.error_message) if wiki.error_message
+      errors.add(:base, project_wiki.error_message) if project_wiki.error_message
       @persisted = false
     end
     @persisted

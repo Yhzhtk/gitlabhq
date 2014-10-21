@@ -3,7 +3,7 @@ module ProjectsHelper
     "You are going to remove #{user.name} from #{project.name} project team. Are you sure?"
   end
 
-  def link_to_project project
+  def link_to_project(project)
     link_to project do
       title = content_tag(:span, project.name, class: 'project-name')
 
@@ -39,7 +39,7 @@ module ProjectsHelper
     end
   end
 
-  def project_title project
+  def project_title(project)
     if project.group
       content_tag :span do
         link_to(simple_sanitize(project.group.name), group_path(project.group)) + " / " + project.name
@@ -54,6 +54,10 @@ module ProjectsHelper
 
   def remove_project_message(project)
     "You are going to remove #{project.name_with_namespace}.\n Removed project CANNOT be restored!\n Are you ABSOLUTELY sure?"
+  end
+
+  def transfer_project_message(project)
+    "You are going to transfer #{project.name_with_namespace} to another owner. Are you ABSOLUTELY sure?"
   end
 
   def project_nav_tabs
@@ -122,6 +126,48 @@ module ProjectsHelper
     options_for_select(values, current_tracker)
   end
 
+  def link_to_toggle_star(title, starred, signed_in)
+    cls = 'star-btn'
+    cls += ' disabled' unless signed_in
+
+    toggle_html = content_tag('span', class: 'toggle') do
+      toggle_text = if starred
+                      ' Unstar'
+                    else
+                      ' Star'
+                    end
+
+      content_tag('i', ' ', class: 'fa fa-star') + toggle_text
+    end
+
+    count_html = content_tag('span', class: 'count') do
+      @project.star_count.to_s
+    end
+
+    link_opts = {
+      title: title,
+      class: cls,
+      method: :post,
+      remote: true,
+      data: {type: 'json'}
+    }
+
+
+    content_tag 'span', class: starred ? 'turn-on' : 'turn-off' do
+      link_to toggle_star_project_path(@project), link_opts do
+        toggle_html + ' ' + count_html
+      end
+    end
+  end
+
+  def link_to_toggle_fork
+    out = content_tag(:i, '', class: 'fa fa-code-fork')
+    out << ' Fork'
+    out << content_tag(:span, class: 'count') do
+      @project.forks_count.to_s
+    end
+  end
+
   private
 
   def get_project_nav_tabs(project, current_user)
@@ -139,7 +185,7 @@ module ProjectsHelper
       nav_tabs << :settings
     end
 
-    [:issues, :wiki, :wall, :snippets].each do |feature|
+    [:issues, :wiki, :snippets].each do |feature|
       nav_tabs << feature if project.send :"#{feature}_enabled"
     end
 
@@ -163,7 +209,7 @@ module ProjectsHelper
   end
 
   def repository_size(project = nil)
-    "#{(project || @project).repository.size} MB"
+    "#{(project || @project).repository_size} MB"
   rescue
     # In order to prevent 500 error
     # when application cannot allocate memory
@@ -220,5 +266,17 @@ module ProjectsHelper
     else
       "Never"
     end
+  end
+
+  def contribution_guide_url(project)
+    if project && project.repository.contribution_guide
+      project_blob_path(project, tree_join(project.default_branch, project.repository.contribution_guide.name))
+    end
+  end
+
+  def hidden_pass_url(original_url)
+    result = URI(original_url)
+    result.password = '*****' if result.password.present?
+    result
   end
 end

@@ -1,10 +1,10 @@
 module Emails
   module Projects
     def project_access_granted_email(user_project_id)
-      @users_project = UsersProject.find user_project_id
-      @project = @users_project.project
+      @project_member = ProjectMember.find user_project_id
+      @project = @project_member.project
       @target_url = project_url(@project)
-      mail(to: @users_project.user.email,
+      mail(to: @project_member.user.email,
            subject: subject("Access to project was granted"))
     end
 
@@ -25,13 +25,15 @@ module Emails
       @branch  = branch
       if @commits.length > 1
         @target_url = project_compare_url(@project, from: @commits.first, to: @commits.last)
+        @subject = "#{@commits.length} new commits pushed to repository"
       else
         @target_url = project_commit_url(@project, @commits.first)
+        @subject = @commits.first.title
       end
 
       mail(from: sender(author_id),
            to: recipient,
-           subject: subject("New push to repository"))
+           subject: subject(@subject))
     end
   end
 end

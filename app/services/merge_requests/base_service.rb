@@ -1,11 +1,5 @@
 module MergeRequests
-  class BaseService < ::BaseService
-
-    private
-
-    def create_assignee_note(merge_request)
-      Note.create_assignee_change_note(merge_request, merge_request.project, current_user, merge_request.assignee)
-    end
+  class BaseService < ::IssuableBaseService
 
     def create_note(merge_request)
       Note.create_status_change_note(merge_request, merge_request.target_project, current_user, merge_request.state, nil)

@@ -1,4 +1,5 @@
-Feature: Admin active tab
+@admin
+Feature: Admin Active Tab
   Background:
     Given I sign in as an admin
 

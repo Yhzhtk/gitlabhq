@@ -15,6 +15,7 @@ module API
           not_found!
         end
       end
+
       # Get a project repository tags
       #
       # Parameters:
@@ -23,6 +24,30 @@ module API
       #   GET /projects/:id/repository/tags
       get ":id/repository/tags" do
         present user_project.repo.tags.sort_by(&:name).reverse, with: Entities::RepoObject, project: user_project
+      end
+
+      # Create tag
+      #
+      # Parameters:
+      #   id (required) - The ID of a project
+      #   tag_name (required) - The name of the tag
+      #   ref (required) - Create tag from commit sha or branch
+      #   message (optional) - Specifying a message creates an annotated tag.
+      # Example Request:
+      #   POST /projects/:id/repository/tags
+      post ':id/repository/tags' do
+        authorize_push_project
+        message = params[:message] || nil
+        result = CreateTagService.new(user_project, current_user).
+          execute(params[:tag_name], params[:ref], message)
+
+        if result[:status] == :success
+          present result[:tag],
+                  with: Entities::RepoObject,
+                  project: user_project
+        else
+          render_api_error!(result[:message], 400)
+        end
       end
 
       # Get a project repository tree
@@ -98,25 +123,44 @@ module API
       #   GET /projects/:id/repository/archive
       get ":id/repository/archive", requirements: { format: Gitlab::Regex.archive_formats_regex } do
         authorize! :download_code, user_project
-        repo = user_project.repository
-        ref = params[:sha]
-        format = params[:format]
-        storage_path = Gitlab.config.gitlab.repository_downloads_path
+        file_path = ArchiveRepositoryService.new.execute(user_project, params[:sha], params[:format])
 
-        file_path = repo.archive_repo(ref, storage_path, format)
         if file_path && File.exists?(file_path)
           data = File.open(file_path, 'rb').read
-
           header["Content-Disposition"] = "attachment; filename=\"#{File.basename(file_path)}\""
-
           content_type MIME::Types.type_for(file_path).first.content_type
-
           env['api.format'] = :binary
-
           present data
         else
           not_found!
         end
+      end
+
+      # Compare two branches, tags or commits
+      #
+      # Parameters:
+      #   id (required) - The ID of a project
+      #   from (required) - the commit sha or branch name
+      #   to (required) - the commit sha or branch name
+      # Example Request:
+      #   GET /projects/:id/repository/compare?from=master&to=feature
+      get ':id/repository/compare' do
+        authorize! :download_code, user_project
+        required_attributes! [:from, :to]
+        compare = Gitlab::Git::Compare.new(user_project.repository.raw_repository, params[:from], params[:to])
+        present compare, with: Entities::Compare
+      end
+
+      # Get repository contributors
+      #
+      # Parameters:
+      #   id (required) - The ID of a project
+      # Example Request:
+      #   GET /projects/:id/repository/contributors
+      get ':id/repository/contributors' do
+        authorize! :download_code, user_project
+
+        present user_project.repository.contributors, with: Entities::Contributor
       end
     end
   end

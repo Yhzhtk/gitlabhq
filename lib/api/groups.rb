@@ -87,10 +87,12 @@ module API
       #   POST /groups/:id/projects/:project_id
       post ":id/projects/:project_id" do
         authenticated_as_admin!
-        @group = Group.find(params[:id])
+        group = Group.find(params[:id])
         project = Project.find(params[:project_id])
-        if project.transfer(@group)
-          present @group
+        result = ::Projects::TransferService.new(project, current_user, namespace_id: group.id).execute
+
+        if result
+          present group
         else
           not_found!
         end
@@ -102,7 +104,7 @@ module API
       #  GET /groups/:id/members
       get ":id/members" do
         group = find_group(params[:id])
-        members = group.users_groups
+        members = group.group_members
         users = (paginate members).collect(&:user)
         present users, with: Entities::GroupMember, group: group
       end
@@ -121,11 +123,11 @@ module API
           render_api_error!("Wrong access level", 422)
         end
         group = find_group(params[:id])
-        if group.users_groups.find_by(user_id: params[:user_id])
+        if group.group_members.find_by(user_id: params[:user_id])
           render_api_error!("Already exists", 409)
         end
         group.add_users([params[:user_id]], params[:access_level])
-        member = group.users_groups.find_by(user_id: params[:user_id])
+        member = group.group_members.find_by(user_id: params[:user_id])
         present member.user, with: Entities::GroupMember, group: group
       end
 
@@ -139,7 +141,7 @@ module API
       #   DELETE /groups/:id/members/:user_id
       delete ":id/members/:user_id" do
         group = find_group(params[:id])
-        member =  group.users_groups.find_by(user_id: params[:user_id])
+        member =  group.group_members.find_by(user_id: params[:user_id])
         if member.nil?
           render_api_error!("404 Not Found - user_id:#{params[:user_id]} not a member of group #{group.name}",404)
         else

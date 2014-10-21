@@ -17,6 +17,7 @@
 #  target_project_id :integer          not null
 #  iid               :integer
 #  description       :text
+#  position          :integer          default(0)
 #
 
 require Rails.root.join("app/models/commit")
@@ -24,6 +25,7 @@ require Rails.root.join("lib/static_model")
 
 class MergeRequest < ActiveRecord::Base
   include Issuable
+  include Taskable
   include InternalId
 
   belongs_to :target_project, foreign_key: :target_project_id, class_name: "Project"
@@ -36,13 +38,16 @@ class MergeRequest < ActiveRecord::Base
 
   delegate :commits, :diffs, :last_commit, :last_commit_short_sha, to: :merge_request_diff, prefix: nil
 
-  attr_accessible :title, :assignee_id, :source_project_id, :source_branch, :target_project_id, :target_branch, :milestone_id, :state_event, :description
-
   attr_accessor :should_remove_source_branch
 
   # When this attribute is true some MR validation is ignored
   # It allows us to close or modify broken merge requests
   attr_accessor :allow_broken
+
+  # Temporary fields to store compare vars
+  # when creating new merge request
+  attr_accessor :can_be_created, :compare_failed,
+    :compare_commits, :compare_diffs
 
   state_machine :state, initial: :opened do
     event :close do
@@ -57,11 +62,11 @@ class MergeRequest < ActiveRecord::Base
       transition closed: :reopened
     end
 
-    event :lock do
+    event :lock_mr do
       transition [:reopened, :opened] => :locked
     end
 
-    event :unlock do
+    event :unlock_mr do
       transition locked: :reopened
     end
 
@@ -108,6 +113,7 @@ class MergeRequest < ActiveRecord::Base
   # Closed scope for merge request should return
   # both merged and closed mr's
   scope :closed, -> { with_states(:closed, :merged) }
+  scope :declined, -> { with_states(:closed) }
 
   def validate_branches
     if target_project == source_project && target_branch == source_branch
@@ -117,9 +123,11 @@ class MergeRequest < ActiveRecord::Base
     if opened? || reopened?
       similar_mrs = self.target_project.merge_requests.where(source_branch: source_branch, target_branch: target_branch, source_project_id: source_project.id).opened
       similar_mrs = similar_mrs.where('id not in (?)', self.id) if self.id
-
       if similar_mrs.any?
-        errors.add :base, "Cannot Create: This merge request already exists: #{similar_mrs.pluck(:title)}"
+        errors.add :validate_branches,
+                   "Cannot Create: This merge request already exists: #{
+                   similar_mrs.pluck(:title)
+                   }"
       end
     end
   end
@@ -135,7 +143,8 @@ class MergeRequest < ActiveRecord::Base
       if source_project.forked_from?(target_project)
         true
       else
-        errors.add :base, "Source project is not a fork of target project"
+        errors.add :validate_fork,
+                   'Source project is not a fork of target project'
       end
     end
   end
@@ -203,12 +212,22 @@ class MergeRequest < ActiveRecord::Base
     Gitlab::Satellite::MergeAction.new(current_user, self).format_patch
   end
 
-  def for_fork?
-    target_project != source_project
+  def hook_attrs
+    attrs = {
+      source: source_project.hook_attrs,
+      target: target_project.hook_attrs,
+      last_commit: nil
+    }
+
+    unless last_commit.nil?
+      attrs.merge!(last_commit: last_commit.hook_attrs(source_project))
+    end
+
+    attributes.merge!(attrs)
   end
 
-  def disallow_source_branch_removal?
-    source_project.root_ref?(source_branch) || source_project.protected_branches.include?(source_branch)
+  def for_fork?
+    target_project != source_project
   end
 
   def project
@@ -218,7 +237,9 @@ class MergeRequest < ActiveRecord::Base
   # Return the set of issues that will be closed if this merge request is accepted.
   def closes_issues
     if target_branch == project.default_branch
-      commits.map { |c| c.closes_issues(project) }.flatten.uniq.sort_by(&:id)
+      issues = commits.flat_map { |c| c.closes_issues(project) }
+      issues += Gitlab::ClosingIssueExtractor.closed_by_message_in_project(description, project)
+      issues.uniq.sort_by(&:id)
     else
       []
     end
@@ -253,6 +274,14 @@ class MergeRequest < ActiveRecord::Base
     end
   end
 
+  def target_project_namespace
+    if target_project && target_project.namespace
+      target_project.namespace.path
+    else
+      "(removed)"
+    end
+  end
+
   def source_branch_exists?
     return false unless self.source_project
 
@@ -274,9 +303,7 @@ class MergeRequest < ActiveRecord::Base
   # Thus it will automatically generate a new fragment
   # when the event is updated because the key changes.
   def reset_events_cache
-    Event.where(target_id: self.id, target_type: 'MergeRequest').
-        order('id DESC').limit(100).
-        update_all(updated_at: Time.now)
+    Event.reset_event_cache_for(self)
   end
 
   def merge_commit_message
@@ -285,6 +312,8 @@ class MergeRequest < ActiveRecord::Base
     message << title.to_s
     message << "\n\n"
     message << description.to_s
+    message << "\n\n"
+    message << "See merge request !#{iid}"
     message
   end
 

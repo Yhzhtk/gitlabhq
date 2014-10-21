@@ -17,47 +17,43 @@ require 'carrierwave/orm/activerecord'
 require 'file_size_validator'
 
 class Group < Namespace
-  has_many :users_groups, dependent: :destroy
-  has_many :users, through: :users_groups
-
-  attr_accessible :avatar
+  has_many :group_members, dependent: :destroy, as: :source, class_name: 'GroupMember'
+  has_many :users, through: :group_members
 
   validate :avatar_type, if: ->(user) { user.avatar_changed? }
   validates :avatar, file_size: { maximum: 100.kilobytes.to_i }
 
   mount_uploader :avatar, AttachmentUploader
-  
-  def self.accessible_to(user)
-    accessible_ids = Project.accessible_to(user).pluck(:namespace_id)
-    accessible_ids += user.groups.pluck(:id) if user
-    where(id: accessible_ids)
-  end
 
   def human_name
     name
   end
 
   def owners
-    @owners ||= users_groups.owners.map(&:user)
+    @owners ||= group_members.owners.map(&:user)
   end
 
-  def add_users(user_ids, group_access)
+  def add_users(user_ids, access_level)
     user_ids.compact.each do |user_id|
-      user = self.users_groups.find_or_initialize_by(user_id: user_id)
-      user.update_attributes(group_access: group_access)
+      user = self.group_members.find_or_initialize_by(user_id: user_id)
+      user.update_attributes(access_level: access_level)
     end
   end
 
-  def add_user(user, group_access)
-    self.users_groups.create(user_id: user.id, group_access: group_access)
+  def add_user(user, access_level)
+    self.group_members.create(user_id: user.id, access_level: access_level)
   end
 
   def add_owner(user)
-    self.add_user(user, UsersGroup::OWNER)
+    self.add_user(user, Gitlab::Access::OWNER)
   end
 
   def has_owner?(user)
     owners.include?(user)
+  end
+
+  def has_master?(user)
+    members.masters.where(user_id: user).any?
   end
 
   def last_owner?(user)
@@ -65,12 +61,32 @@ class Group < Namespace
   end
 
   def members
-    users_groups
+    group_members
   end
 
   def avatar_type
     unless self.avatar.image?
       self.errors.add :avatar, "only images allowed"
+    end
+  end
+
+  def public_profile?
+    projects.public_only.any?
+  end
+
+  class << self
+    def search(query)
+      where("LOWER(namespaces.name) LIKE :query", query: "%#{query.downcase}%")
+    end
+
+    def sort(method)
+      case method.to_s
+      when "newest" then reorder("namespaces.created_at DESC")
+      when "oldest" then reorder("namespaces.created_at ASC")
+      when "recently_updated" then reorder("namespaces.updated_at DESC")
+      when "last_updated" then reorder("namespaces.updated_at ASC")
+      else reorder("namespaces.path, namespaces.name ASC")
+      end
     end
   end
 end

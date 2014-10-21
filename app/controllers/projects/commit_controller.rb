@@ -13,15 +13,7 @@ class Projects::CommitController < Projects::ApplicationController
 
     @line_notes = project.notes.for_commit_id(commit.id).inline
     @branches = project.repository.branch_names_contains(commit.id)
-
-    begin
-      @suppress_diff = true if commit.diff_suppress? && !params[:force_show_diff]
-      @force_suppress_diff = commit.diff_force_suppress?
-    rescue Grit::Git::GitTimeout
-      @suppress_diff = true
-      @status = :huge_commit
-    end
-
+    @diffs = @commit.diffs
     @note = project.build_commit_note(commit)
     @notes_count = project.notes.for_commit_id(commit.id).count
     @notes = project.notes.for_commit_id(@commit.id).not_inline.fresh
@@ -33,12 +25,7 @@ class Projects::CommitController < Projects::ApplicationController
     }
 
     respond_to do |format|
-      format.html do
-        if @status == :huge_commit
-          render "huge_commit" and return
-        end
-      end
-
+      format.html
       format.diff  { render text: @commit.to_diff }
       format.patch { render text: @commit.to_patch }
     end

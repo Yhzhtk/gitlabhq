@@ -13,6 +13,8 @@ module Issuable
     belongs_to :assignee, class_name: "User"
     belongs_to :milestone
     has_many :notes, as: :noteable, dependent: :destroy
+    has_many :label_links, as: :target, dependent: :destroy
+    has_many :labels, through: :label_links
 
     validates :author, presence: true
     validates :title, presence: true, length: { within: 0..255 }
@@ -24,6 +26,8 @@ module Issuable
     scope :unassigned, -> { where("assignee_id IS NULL") }
     scope :of_projects, ->(ids) { where(project_id: ids) }
     scope :opened, -> { with_state(:opened, :reopened) }
+    scope :only_opened, -> { with_state(:opened) }
+    scope :only_reopened, -> { with_state(:reopened) }
     scope :closed, -> { with_state(:closed) }
 
     delegate :name,
@@ -42,7 +46,11 @@ module Issuable
 
   module ClassMethods
     def search(query)
-      where("title like :query", query: "%#{query}%")
+      where("LOWER(title) like :query", query: "%#{query.downcase}%")
+    end
+
+    def full_search(query)
+      where("LOWER(title) like :query OR LOWER(description) like :query", query: "%#{query.downcase}%")
     end
 
     def sort(method)
@@ -126,7 +134,23 @@ module Issuable
   def to_hook_data
     {
       object_kind: self.class.name.underscore,
-      object_attributes: self.attributes
+      object_attributes: hook_attrs
     }
+  end
+
+  def label_names
+    labels.order('title ASC').pluck(:title)
+  end
+
+  def remove_labels
+    labels.delete_all
+  end
+
+  def add_labels_by_names(label_names)
+    label_names.each do |label_name|
+      label = project.labels.create_with(
+        color: Label::DEFAULT_COLOR).find_or_create_by(title: label_name.strip)
+      self.labels << label
+    end
   end
 end

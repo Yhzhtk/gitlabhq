@@ -1,3 +1,5 @@
+# Issues
+
 ## List issues
 
 Get all issues created by authenticated user. This function takes pagination parameters
@@ -5,7 +7,17 @@ Get all issues created by authenticated user. This function takes pagination par
 
 ```
 GET /issues
+GET /issues?state=opened
+GET /issues?state=closed
+GET /issues?labels=foo
+GET /issues?labels=foo,bar
+GET /issues?labels=foo,bar&state=opened
 ```
+
+Parameters:
+
+- `state` (optional) - Return `all` issues or just those that are `opened` or `closed`
+- `labels` (optional) - Comma-separated list of label names
 
 ```json
 [
@@ -71,7 +83,6 @@ GET /issues
 ]
 ```
 
-
 ## List project issues
 
 Get a list of project issues. This function accepts pagination parameters `page` and `per_page`
@@ -79,12 +90,21 @@ to return the list of project issues.
 
 ```
 GET /projects/:id/issues
+GET /projects/:id/issues?state=opened
+GET /projects/:id/issues?state=closed
+GET /projects/:id/issues?labels=foo
+GET /projects/:id/issues?labels=foo,bar
+GET /projects/:id/issues?labels=foo,bar&state=opened
+GET /projects/:id/issues?milestone=1.0.0
+GET /projects/:id/issues?milestone=1.0.0&state=opened
 ```
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-
+- `id` (required) - The ID of a project
+- `state` (optional) - Return `all` issues or just those that are `opened` or `closed`
+- `labels` (optional) - Comma-separated list of label names
+- `milestone` (optional) - Milestone title
 
 ## Single issue
 
@@ -96,8 +116,8 @@ GET /projects/:id/issues/:issue_id
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `issue_id` (required) - The ID of a project issue
+- `id` (required) - The ID of a project
+- `issue_id` (required) - The ID of a project issue
 
 ```json
 {
@@ -140,7 +160,6 @@ Parameters:
 }
 ```
 
-
 ## New issue
 
 Creates a new project issue.
@@ -151,13 +170,15 @@ POST /projects/:id/issues
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `title` (required) - The title of an issue
-+ `description` (optional) - The description of an issue
-+ `assignee_id` (optional) - The ID of a user to assign issue
-+ `milestone_id` (optional) - The ID of a milestone to assign issue
-+ `labels` (optional) - Comma-separated label names for an issue
+- `id` (required) - The ID of a project
+- `title` (required) - The title of an issue
+- `description` (optional) - The description of an issue
+- `assignee_id` (optional) - The ID of a user to assign issue
+- `milestone_id` (optional) - The ID of a milestone to assign issue
+- `labels` (optional) - Comma-separated label names for an issue
 
+If the operation is successful, 200 and the newly created issue is returned.
+If an error occurs, an error number and a message explaining the reason is returned.
 
 ## Edit issue
 
@@ -169,21 +190,21 @@ PUT /projects/:id/issues/:issue_id
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `issue_id` (required) - The ID of a project's issue
-+ `title` (optional) - The title of an issue
-+ `description` (optional) - The description of an issue
-+ `assignee_id` (optional) - The ID of a user to assign issue
-+ `milestone_id` (optional) - The ID of a milestone to assign issue
-+ `labels` (optional) - Comma-separated label names for an issue
-+ `state_event` (optional) - The state event of an issue ('close' to close issue and 'reopen' to reopen it)
+- `id` (required) - The ID of a project
+- `issue_id` (required) - The ID of a project's issue
+- `title` (optional) - The title of an issue
+- `description` (optional) - The description of an issue
+- `assignee_id` (optional) - The ID of a user to assign issue
+- `milestone_id` (optional) - The ID of a milestone to assign issue
+- `labels` (optional) - Comma-separated label names for an issue
+- `state_event` (optional) - The state event of an issue ('close' to close issue and 'reopen' to reopen it)
 
+If the operation is successful, 200 and the updated issue is returned.
+If an error occurs, an error number and a message explaining the reason is returned.
 
 ## Delete existing issue (**Deprecated**)
 
-The function is deprecated and returns a `405 Method Not Allowed`
-error if called. An issue gets now closed and is done by calling `PUT /projects/:id/issues/:issue_id` with
-parameter `closed` set to 1.
+The function is deprecated and returns a `405 Method Not Allowed` error if called. An issue gets now closed and is done by calling `PUT /projects/:id/issues/:issue_id` with parameter `closed` set to 1.
 
 ```
 DELETE /projects/:id/issues/:issue_id
@@ -191,5 +212,9 @@ DELETE /projects/:id/issues/:issue_id
 
 Parameters:
 
-+ `id` (required) - The project ID
-+ `issue_id` (required) - The ID of the issue
+- `id` (required) - The project ID
+- `issue_id` (required) - The ID of the issue
+
+## Comments on issues
+
+Comments are done via the notes resource.

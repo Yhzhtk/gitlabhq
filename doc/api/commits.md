@@ -10,8 +10,8 @@ GET /projects/:id/repository/commits
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `ref_name` (optional) - The name of a repository branch or tag or if not given the default branch
+- `id` (required) - The ID of a project
+- `ref_name` (optional) - The name of a repository branch or tag or if not given the default branch
 
 ```json
 [
@@ -21,7 +21,8 @@ Parameters:
     "title": "Replace sanitize with escape once",
     "author_name": "Dmitriy Zaporozhets",
     "author_email": "dzaporozhets@sphereconsultinginc.com",
-    "created_at": "2012-09-20T11:50:22+03:00"
+    "created_at": "2012-09-20T11:50:22+03:00",
+    "message": "Replace sanitize with escape once"
   },
   {
     "id": "6104942438c14ec7bd21c6cd5bd995272b3faff6",
@@ -29,7 +30,8 @@ Parameters:
     "title": "Sanitize for network graph",
     "author_name": "randx",
     "author_email": "dmitriy.zaporozhets@gmail.com",
-    "created_at": "2012-09-20T09:06:12+03:00"
+    "created_at": "2012-09-20T09:06:12+03:00",
+    "message": "Sanitize for network graph"
   }
 ]
 ```
@@ -44,8 +46,8 @@ GET /projects/:id/repository/commits/:sha
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `sha` (required) - The commit hash or name of a repository branch or tag
+- `id` (required) - The ID of a project
+- `sha` (required) - The commit hash or name of a repository branch or tag
 
 ```json
 {
@@ -55,6 +57,7 @@ Parameters:
   "author_name": "randx",
   "author_email": "dmitriy.zaporozhets@gmail.com",
   "created_at": "2012-09-20T09:06:12+03:00",
+  "message": "Sanitize for network graph",
   "committed_date": "2012-09-20T09:06:12+03:00",
   "authored_date": "2012-09-20T09:06:12+03:00",
   "parent_ids": [
@@ -62,7 +65,6 @@ Parameters:
   ]
 }
 ```
-
 
 ## Get the diff of a commit
 
@@ -74,8 +76,8 @@ GET /projects/:id/repository/commits/:sha/diff
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `sha` (required) - The name of a repository branch or tag or if not given the default branch
+- `id` (required) - The ID of a project
+- `sha` (required) - The name of a repository branch or tag or if not given the default branch
 
 ```json
 [
@@ -91,5 +93,3 @@ Parameters:
   }
 ]
 ```
-
-

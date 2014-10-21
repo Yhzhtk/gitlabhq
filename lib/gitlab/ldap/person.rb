@@ -1,19 +1,29 @@
 module Gitlab
   module LDAP
     class Person
-      def self.find_by_uid(uid, adapter=nil)
-        adapter ||= Gitlab::LDAP::Adapter.new
-        adapter.user(config.uid, uid)
+      # Active Directory-specific LDAP filter that checks if bit 2 of the
+      # userAccountControl attribute is set.
+      # Source: http://ctogonewild.com/2009/09/03/bitmask-searches-in-ldap/
+      AD_USER_DISABLED = Net::LDAP::Filter.ex("userAccountControl:1.2.840.113556.1.4.803", "2")
+
+      attr_accessor :entry, :provider
+
+      def self.find_by_uid(uid, adapter)
+        adapter.user(adapter.config.uid, uid)
       end
 
-      def self.find_by_dn(dn, adapter=nil)
-        adapter ||= Gitlab::LDAP::Adapter.new
+      def self.find_by_dn(dn, adapter)
         adapter.user('dn', dn)
       end
 
-      def initialize(entry)
+      def self.disabled_via_active_directory?(dn, adapter)
+        adapter.dn_matches_filter?(dn, AD_USER_DISABLED)
+      end
+
+      def initialize(entry, provider)
         Rails.logger.debug { "Instantiating #{self.class.name} with LDIF:\n#{entry.to_ldif}" }
         @entry = entry
+        @provider = provider
       end
 
       def name
@@ -28,6 +38,10 @@ module Gitlab
         uid
       end
 
+      def email
+        entry.try(:mail)
+      end
+
       def dn
         entry.dn
       end
@@ -38,12 +52,8 @@ module Gitlab
         @entry
       end
 
-      def adapter
-        @adapter ||= Gitlab::LDAP::Adapter.new
-      end
-
       def config
-        @config ||= Gitlab.config.ldap
+        @config ||= Gitlab::LDAP::Config.new(provider)
       end
     end
   end

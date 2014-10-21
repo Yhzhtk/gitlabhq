@@ -2,8 +2,9 @@ class ProjectWiki
   include Gitlab::ShellAdapter
 
   MARKUPS = {
-    "Markdown" => :markdown,
-    "RDoc"     => :rdoc
+    'Markdown' => :markdown,
+    'RDoc'     => :rdoc,
+    'AsciiDoc' => :asciidoc
   }
 
   class CouldNotCreateWikiError < StandardError; end
@@ -64,8 +65,18 @@ class ProjectWiki
   #
   # Returns an initialized WikiPage instance or nil
   def find_page(title, version = nil)
-    if page = wiki.page(title, version)
+    page_title, page_dir = page_title_and_dir(title)
+    if page = wiki.page(page_title, version, page_dir)
       WikiPage.new(self, page, true)
+    else
+      nil
+    end
+  end
+
+  def find_file(name, version = nil, try_on_disk = true)
+    version = wiki.ref if version.nil? # Gollum::Wiki#file ?
+    if wiki_file = wiki.file(name, version, try_on_disk)
+      wiki_file
     else
       nil
     end
@@ -88,6 +99,24 @@ class ProjectWiki
 
   def delete_page(page, message = nil)
     wiki.delete_page(page, commit_details(:deleted, message, page.title))
+  end
+
+  def page_title_and_dir(title)
+    title_array =  title.split("/")
+    title = title_array.pop
+    [title.gsub(/\.[^.]*$/, ""), title_array.join("/")]
+  end
+
+  def search_files(query)
+    repository.search_files(query, default_branch)
+  end
+
+  def repository
+    Repository.new(path_with_namespace, default_branch)
+  end
+
+  def default_branch
+    wiki.class.default_ref
   end
 
   private

@@ -45,16 +45,6 @@ Gitlab::Application.configure do
   # Use a different logger for distributed setups
   # config.logger = ActiveSupport::TaggedLogging.new(SyslogLogger.new)
 
-  # Use a different cache store in production
-  config_file = Rails.root.join('config', 'resque.yml')
-
-  resque_url = if File.exists?(config_file)
-                 YAML.load_file(config_file)[Rails.env]
-               else
-                 "redis://localhost:6379"
-               end
-  config.cache_store = :redis_store, resque_url
-
   # Enable serving of images, stylesheets, and JavaScripts from an asset server
   # config.action_controller.asset_host = "http://assets.example.com"
 
@@ -73,10 +63,6 @@ Gitlab::Application.configure do
 
   # Send deprecation notices to registered listeners
   config.active_support.deprecation = :notify
-
-  # Log the query plan for queries taking more than this (works
-  # with SQLite, MySQL, and PostgreSQL)
-  # config.active_record.auto_explain_threshold_in_seconds = 0.5
 
   config.action_mailer.delivery_method = :sendmail
   # Defaults to:

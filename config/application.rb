@@ -2,7 +2,7 @@ require File.expand_path('../boot', __FILE__)
 
 require 'rails/all'
 require 'devise'
-
+I18n.config.enforce_available_locales = false
 Bundler.require(:default, Rails.env)
 
 module Gitlab
@@ -12,21 +12,16 @@ module Gitlab
     # -- all .rb files in that directory are automatically loaded.
 
     # Custom directories with classes and modules you want to be autoloadable.
-    config.autoload_paths += %W(#{config.root}/lib #{config.root}/app/finders #{config.root}/app/models/concerns #{config.root}/app/models/project_services)
+    config.autoload_paths += %W(#{config.root}/lib
+                                #{config.root}/app/finders
+                                #{config.root}/app/models/hooks
+                                #{config.root}/app/models/concerns
+                                #{config.root}/app/models/project_services
+                                #{config.root}/app/models/members)
 
     # Only load the plugins named here, in the order given (default is alphabetical).
     # :all can be used as a placeholder for all plugins not explicitly named.
     # config.plugins = [ :exception_notification, :ssl_requirement, :all ]
-
-    # Activate observers that should always be running.
-    config.active_record.observers = :milestone_observer,
-                                     :project_activity_cache_observer,
-                                     :note_observer,
-                                     :project_observer,
-                                     :system_hook_observer,
-                                     :user_observer,
-                                     :users_group_observer,
-                                     :users_project_observer
 
     # Set Time.zone default to the specified zone and make Active Record auto-convert to this zone.
     # Run "rake -D time" for a list of tasks for finding time zone names. Default is UTC.
@@ -51,12 +46,6 @@ module Gitlab
     # like if you have constraints or database-specific column types
     # config.active_record.schema_format = :sql
 
-    # Enforce whitelist mode for mass assignment.
-    # This will create an empty whitelist of attributes available for mass-assignment for all models
-    # in your app. As such, your models will need to explicitly whitelist or blacklist accessible
-    # parameters by using an attr_accessible or attr_protected declaration.
-    config.active_record.whitelist_attributes = true
-
     # Enable the asset pipeline
     config.assets.enabled = true
     config.assets.paths << Emoji.images_path
@@ -66,13 +55,16 @@ module Gitlab
     # Version of your assets, change this if you want to expire all your assets
     config.assets.version = '1.0'
 
+    # Relative url support
     # Uncomment and customize the last line to run in a non-root path
     # WARNING: We recommend creating a FQDN to host GitLab in a root path instead of this.
-    # Note that four settings need to be changed for this to work.
+    # Note that following settings need to be changed for this to work.
     # 1) In your application.rb file: config.relative_url_root = "/gitlab"
     # 2) In your gitlab.yml file: relative_url_root: /gitlab
     # 3) In your unicorn.rb: ENV['RAILS_RELATIVE_URL_ROOT'] = "/gitlab"
     # 4) In ../gitlab-shell/config.yml: gitlab_url: "http://127.0.0.1/gitlab"
+    # 5) In lib/support/nginx/gitlab : do not use asset gzipping, remove block starting with "location ~ ^/(assets)/"
+    #
     # To update the path, run: sudo -u git -H bundle exec rake assets:precompile RAILS_ENV=production
     #
     # config.relative_url_root = "/gitlab"
@@ -86,5 +78,24 @@ module Gitlab
         resource '/api/*', headers: :any, methods: [:get, :post, :options, :put, :delete]
       end
     end
+
+    # Use Redis caching across all environments
+    redis_config_file = Rails.root.join('config', 'resque.yml')
+
+    redis_url_string = if File.exists?(redis_config_file)
+                         YAML.load_file(redis_config_file)[Rails.env]
+                       else
+                         "redis://localhost:6379"
+                       end
+
+    # Redis::Store does not handle Unix sockets well, so let's do it for them
+    redis_config_hash = Redis::Store::Factory.extract_host_options_from_uri(redis_url_string)
+    redis_uri = URI.parse(redis_url_string)
+    if redis_uri.scheme == 'unix'
+      redis_config_hash[:path] = redis_uri.path
+    end
+
+    redis_config_hash[:namespace] = 'cache:gitlab'
+    config.cache_store = :redis_store, redis_config_hash
   end
 end

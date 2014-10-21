@@ -1,3 +1,5 @@
+# Project snippets
+
 ## List snippets
 
 Get a list of project snippets.
@@ -8,8 +10,7 @@ GET /projects/:id/snippets
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-
+- `id` (required) - The ID of a project
 
 ## Single snippet
 
@@ -21,8 +22,8 @@ GET /projects/:id/snippets/:snippet_id
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `snippet_id` (required) - The ID of a project's snippet
+- `id` (required) - The ID of a project
+- `snippet_id` (required) - The ID of a project's snippet
 
 ```json
 {
@@ -43,7 +44,6 @@ Parameters:
 }
 ```
 
-
 ## Create new snippet
 
 Creates a new project snippet. The user must have permission to create new snippets.
@@ -54,11 +54,10 @@ POST /projects/:id/snippets
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `title` (required) - The title of a snippet
-+ `file_name` (required) - The name of a snippet file
-+ `code` (required) - The content of a snippet
-
+- `id` (required) - The ID of a project
+- `title` (required) - The title of a snippet
+- `file_name` (required) - The name of a snippet file
+- `code` (required) - The content of a snippet
 
 ## Update snippet
 
@@ -70,17 +69,16 @@ PUT /projects/:id/snippets/:snippet_id
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `snippet_id` (required) - The ID of a project's snippet
-+ `title` (optional) - The title of a snippet
-+ `file_name` (optional) - The name of a snippet file
-+ `code` (optional) - The content of a snippet
-
+- `id` (required) - The ID of a project
+- `snippet_id` (required) - The ID of a project's snippet
+- `title` (optional) - The title of a snippet
+- `file_name` (optional) - The name of a snippet file
+- `code` (optional) - The content of a snippet
 
 ## Delete snippet
 
 Deletes an existing project snippet. This is an idempotent function and deleting a non-existent
-snippet still returns a `200 Ok` status code.
+snippet still returns a `200 OK` status code.
 
 ```
 DELETE /projects/:id/snippets/:snippet_id
@@ -88,9 +86,8 @@ DELETE /projects/:id/snippets/:snippet_id
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `snippet_id` (required) - The ID of a project's snippet
-
+- `id` (required) - The ID of a project
+- `snippet_id` (required) - The ID of a project's snippet
 
 ## Snippet content
 
@@ -102,5 +99,5 @@ GET /projects/:id/snippets/:snippet_id/raw
 
 Parameters:
 
-+ `id` (required) - The ID of a project
-+ `snippet_id` (required) - The ID of a project's snippet
+- `id` (required) - The ID of a project
+- `snippet_id` (required) - The ID of a project's snippet

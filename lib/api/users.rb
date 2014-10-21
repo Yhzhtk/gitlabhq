@@ -13,7 +13,12 @@ module API
         @users = @users.active if params[:active].present?
         @users = @users.search(params[:search]) if params[:search].present?
         @users = paginate @users
-        present @users, with: Entities::User
+
+        if current_user.is_admin?
+          present @users, with: Entities::UserFull
+        else
+          present @users, with: Entities::UserBasic
+        end
       end
 
       # Get a single user
@@ -24,7 +29,12 @@ module API
       #   GET /users/:id
       get ":id" do
         @user = User.find(params[:id])
-        present @user, with: Entities::User
+
+        if current_user.is_admin?
+          present @user, with: Entities::UserFull
+        else
+          present @user, with: Entities::UserBasic
+        end
       end
 
       # Create user. Available only for admin
@@ -32,7 +42,8 @@ module API
       # Parameters:
       #   email (required)                  - Email
       #   password (required)               - Password
-      #   name                              - Name
+      #   name (required)                   - Name
+      #   username (required)               - Name
       #   skype                             - Skype ID
       #   linkedin                          - Linkedin
       #   twitter                           - Twitter account
@@ -49,13 +60,21 @@ module API
         authenticated_as_admin!
         required_attributes! [:email, :password, :name, :username]
         attrs = attributes_for_keys [:email, :name, :password, :skype, :linkedin, :twitter, :projects_limit, :username, :extern_uid, :provider, :bio, :can_create_group, :admin]
-        user = User.build_user(attrs, as: :admin)
+        user = User.build_user(attrs)
         admin = attrs.delete(:admin)
         user.admin = admin unless admin.nil?
         if user.save
-          present user, with: Entities::User
+          present user, with: Entities::UserFull
         else
-          not_found!
+          conflict!('Email has already been taken') if User.
+              where(email: user.email).
+              count > 0
+
+          conflict!('Username has already been taken') if User.
+              where(username: user.username).
+              count > 0
+
+          render_validation_error!(user)
         end
       end
 
@@ -82,14 +101,23 @@ module API
 
         attrs = attributes_for_keys [:email, :name, :password, :skype, :linkedin, :twitter, :website_url, :projects_limit, :username, :extern_uid, :provider, :bio, :can_create_group, :admin]
         user = User.find(params[:id])
-        not_found!("User not found") unless user
+        not_found!('User') unless user
 
         admin = attrs.delete(:admin)
         user.admin = admin unless admin.nil?
-        if user.update_attributes(attrs, as: :admin)
-          present user, with: Entities::User
+
+        conflict!('Email has already been taken') if attrs[:email] &&
+            User.where(email: attrs[:email]).
+                where.not(id: user.id).count > 0
+
+        conflict!('Username has already been taken') if attrs[:username] &&
+            User.where(username: attrs[:username]).
+                where.not(id: user.id).count > 0
+
+        if user.update_attributes(attrs)
+          present user, with: Entities::UserFull
         else
-          not_found!
+          render_validation_error!(user)
         end
       end
 
@@ -103,13 +131,50 @@ module API
       # POST /users/:id/keys
       post ":id/keys" do
         authenticated_as_admin!
+        required_attributes! [:title, :key]
+
         user = User.find(params[:id])
         attrs = attributes_for_keys [:title, :key]
         key = user.keys.new attrs
         if key.save
           present key, with: Entities::SSHKey
         else
-          not_found!
+          render_validation_error!(key)
+        end
+      end
+
+      # Get ssh keys of a specified user. Only available to admin users.
+      #
+      # Parameters:
+      # uid (required) - The ID of a user
+      # Example Request:
+      # GET /users/:uid/keys
+      get ':uid/keys' do
+        authenticated_as_admin!
+        user = User.find_by(id: params[:uid])
+        not_found!('User') unless user
+
+        present user.keys, with: Entities::SSHKey
+      end
+
+      # Delete existing ssh key of a specified user. Only available to admin
+      # users.
+      #
+      # Parameters:
+      #   uid (required) - The ID of a user
+      #   id (required) - SSH Key ID
+      # Example Request:
+      #   DELETE /users/:uid/keys/:id
+      delete ':uid/keys/:id' do
+        authenticated_as_admin!
+        user = User.find_by(id: params[:uid])
+        not_found!('User') unless user
+
+        begin
+          key = user.keys.find params[:id]
+          key.destroy
+        rescue ActiveRecord::RecordNotFound
+          not_found!('Key')
         end
       end
 
@@ -124,7 +189,7 @@ module API
         if user
           user.destroy
         else
-          not_found!
+          not_found!('User')
         end
       end
     end
@@ -170,7 +235,7 @@ module API
         if key.save
           present key, with: Entities::SSHKey
         else
-          not_found!
+          render_validation_error!(key)
         end
       end
 

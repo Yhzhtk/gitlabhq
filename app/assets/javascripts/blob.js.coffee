@@ -1,4 +1,4 @@
-class BlobView
+class @BlobView
   constructor: ->
     # handle multi-line select
     handleMultiSelect = (e) ->
@@ -26,7 +26,7 @@ class BlobView
       unless isNaN first_line
         $("#tree-content-holder .highlight .line").removeClass("hll")
         $("#LC#{line}").addClass("hll") for line in [first_line..last_line]
-        $("#L#{first_line}").ScrollTo() unless e?
+        $.scrollTo("#L#{first_line}") unless e?
 
     # parse selected lines from hash
     # always return first and last line (initialized to NaN)
@@ -71,6 +71,3 @@ class BlobView
 
     # Highlight the correct lines when the hash part of the URL changes
     $(window).on("hashchange", highlightBlobLines)
-
-
-@BlobView = BlobView

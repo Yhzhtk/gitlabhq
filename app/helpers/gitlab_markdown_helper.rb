@@ -19,7 +19,7 @@ module GitlabMarkdownHelper
                      escape_once(body)
                    end
 
-    gfm_body = gfm(escaped_body, html_options)
+    gfm_body = gfm(escaped_body, @project, html_options)
 
     gfm_body.gsub!(%r{<a.*?>.*?</a>}m) do |match|
       "</a>#{match}#{link_to("", url, html_options)[0..-5]}" # "</a>".length +1
@@ -51,6 +51,16 @@ module GitlabMarkdownHelper
     @markdown.render(text).html_safe
   end
 
+  # Return the first line of +text+, up to +max_chars+, after parsing the line
+  # as Markdown.  HTML tags in the parsed output are not counted toward the
+  # +max_chars+ limit.  If the length limit falls within a tag's contents, then
+  # the tag contents are truncated without removing the closing tag.
+  def first_line_in_markdown(text, max_chars = nil)
+    md = markdown(text).strip
+
+    truncate_visible(md, max_chars || md.length) if md.present?
+  end
+
   def render_wiki_content(wiki_page)
     if wiki_page.format == :markdown
       markdown(wiki_page.content)
@@ -59,90 +69,81 @@ module GitlabMarkdownHelper
     end
   end
 
-  # text - whole text from a markdown file
-  # project_path_with_namespace - namespace/projectname, eg. gitlabhq/gitlabhq
-  # ref - name of the branch or reference, eg. stable
-  # requested_path - path of request, eg. doc/api/README.md, used in special case when path is pointing to the .md file were the original request is coming from
-  def create_relative_links(text, project, ref, requested_path)
-    @path_to_satellite = project.satellite.path
-    project_path_with_namespace = project.path_with_namespace
+  def create_relative_links(text)
     paths = extract_paths(text)
-    paths.each do |file_path|
-      original_file_path = extract(file_path)
-      new_path = rebuild_path(project_path_with_namespace, original_file_path, requested_path, ref)
-      if reference_path?(file_path)
-        # Replacing old string with a new one that contains updated path
-        # eg. [some document]: document.md will be replaced with [some document] /namespace/project/master/blob/document.md
-        text.gsub!(file_path, file_path.gsub(original_file_path, "/#{new_path}"))
-      else
-        # Replacing old string with a new one with brackets ]() to prevent replacing occurence of a word
-        # e.g. If we have a markdown like [test](test) this will replace ](test) and not the word test
-        text.gsub!("](#{file_path})", "](/#{new_path})")
+
+    paths.uniq.each do |file_path|
+      # If project does not have repository
+      # its nothing to rebuild
+      #
+      # TODO: pass project variable to markdown helper instead of using
+      # instance variable. Right now it generates invalid path for pages out
+      # of project scope. Example: search results where can be rendered markdown
+      # from different projects
+      if @repository && @repository.exists? && !@repository.empty?
+        new_path = rebuild_path(file_path)
+        # Finds quoted path so we don't replace other mentions of the string
+        # eg. "doc/api" will be replaced and "/home/doc/api/text" won't
+        text.gsub!("\"#{file_path}\"", "\"/#{new_path}\"")
       end
     end
+
     text
   end
 
-  def extract_paths(markdown_text)
-    all_markdown_paths = pick_out_paths(markdown_text)
-    paths = remove_empty(all_markdown_paths)
-    select_relative(paths)
+  def extract_paths(text)
+    links = substitute_links(text)
+    image_links = substitute_image_links(text)
+    links + image_links
   end
 
-  # Split the markdown text to each line and find all paths, this will match anything with - ]("some_text") and [some text]: file.md
-  def pick_out_paths(markdown_text)
-    inline_paths = markdown_text.split("\n").map { |text| text.scan(/\]\(([^(]+)\)/) }
-    reference_paths = markdown_text.split("\n").map { |text| text.scan(/\[.*\]:.*/) }
-    inline_paths + reference_paths
+  def substitute_links(text)
+    links = text.scan(/<a href=\"([^"]*)\">/)
+    relative_links = links.flatten.reject{ |link| link_to_ignore? link }
+    relative_links
   end
 
-  # Removes any empty result produced by not matching the regexp
-  def remove_empty(paths)
-    paths.reject{|l| l.empty? }.flatten
+  def substitute_image_links(text)
+    links = text.scan(/<img src=\"([^"]*)\"/)
+    relative_links = links.flatten.reject{ |link| link_to_ignore? link }
+    relative_links
   end
 
-  # If a path is a reference style link we need to omit ]:
-  def extract(path)
-    path.split("]: ").last
-  end
-
-  # Reject any path that contains ignored protocol
-  # eg. reject "https://gitlab.org} but accept "doc/api/README.md"
-  def select_relative(paths)
-    paths.reject{|path| ignored_protocols.map{|protocol| path.include?(protocol)}.any?}
-  end
-
-  # Check whether a path is a reference-style link
-  def reference_path?(path)
-    path.include?("]: ")
+  def link_to_ignore?(link)
+    if link =~ /\#\w+/
+      # ignore anchors like <a href="#my-header">
+      true
+    else
+      ignored_protocols.map{ |protocol| link.include?(protocol) }.any?
+    end
   end
 
   def ignored_protocols
     ["http://","https://", "ftp://", "mailto:"]
   end
 
-  def rebuild_path(path_with_namespace, path, requested_path, ref)
+  def rebuild_path(path)
     path.gsub!(/(#.*)/, "")
     id = $1 || ""
-    file_path = relative_file_path(path, requested_path)
+    file_path = relative_file_path(path)
+    file_path = sanitize_slashes(file_path)
+
     [
-      path_with_namespace,
-      path_with_ref(file_path, ref),
+      Gitlab.config.gitlab.relative_url_root,
+      @project.path_with_namespace,
+      path_with_ref(file_path),
       file_path
-    ].compact.join("/").gsub(/\/*$/, '') + id
+    ].compact.join("/").gsub(/^\/*|\/*$/, '') + id
   end
 
-  # Checks if the path exists in the repo
-  # eg. checks if doc/README.md exists, if not then link to blob
-  def path_with_ref(path, ref)
-    if file_exists?(path)
-      "#{local_path(path)}/#{correct_ref(ref)}"
-    else
-      "blob/#{correct_ref(ref)}"
-    end
+  def sanitize_slashes(path)
+    path[0] = "" if path.start_with?("/")
+    path.chop if path.end_with?("/")
+    path
   end
 
-  def relative_file_path(path, requested_path)
+  def relative_file_path(path)
+    requested_path = @path
     nested_path = build_nested_path(path, requested_path)
     return nested_path if file_exists?(nested_path)
     path
@@ -152,7 +153,7 @@ module GitlabMarkdownHelper
   # If we are at doc/api/README.md and the README.md contains relative links like [Users](users.md)
   # this takes the request path(doc/api/README.md), and replaces the README.md with users.md so the path looks like doc/api/users.md
   # If we are at doc/api and the README.md shown in below the tree view
-  # this takes the rquest path(doc/api) and adds users.md so the path looks like doc/api/users.md
+  # this takes the request path(doc/api) and adds users.md so the path looks like doc/api/users.md
   def build_nested_path(path, request_path)
     return request_path if path == ""
     return path unless request_path
@@ -163,6 +164,16 @@ module GitlabMarkdownHelper
       base = request_path.split("/")
       base.pop
       base.push(path).join("/")
+    end
+  end
+
+  # Checks if the path exists in the repo
+  # eg. checks if doc/README.md exists, if not then link to blob
+  def path_with_ref(path)
+    if file_exists?(path)
+      "#{local_path(path)}/#{correct_ref}"
+    else
+      "blob/#{correct_ref}"
     end
   end
 
@@ -179,20 +190,68 @@ module GitlabMarkdownHelper
     return "blob"
   end
 
-  def current_ref
-    @commit.nil? ? "master" : @commit.id
-  end
-
   def current_sha
     if @commit
       @commit.id
-    else
-      @repository.head_commit.sha
+    elsif @repository && !@repository.empty?
+      if @ref
+        @repository.commit(@ref).try(:sha)
+      else
+        @repository.head_commit.sha
+      end
     end
   end
 
   # We will assume that if no ref exists we can point to master
-  def correct_ref(ref)
-    ref ? ref : "master"
+  def correct_ref
+    @ref ? @ref : "master"
+  end
+
+  private
+
+  # Return +text+, truncated to +max_chars+ characters, excluding any HTML
+  # tags.
+  def truncate_visible(text, max_chars)
+    doc = Nokogiri::HTML.fragment(text)
+    content_length = 0
+    truncated = false
+
+    doc.traverse do |node|
+      if node.text? || node.content.empty?
+        if truncated
+          node.remove
+          next
+        end
+
+        # Handle line breaks within a node
+        if node.content.strip.lines.length > 1
+          node.content = "#{node.content.lines.first.chomp}..."
+          truncated = true
+        end
+
+        num_remaining = max_chars - content_length
+        if node.content.length > num_remaining
+          node.content = node.content.truncate(num_remaining)
+          truncated = true
+        end
+        content_length += node.content.length
+      end
+
+      truncated = truncate_if_block(node, truncated)
+    end
+
+    doc.to_html
+  end
+
+  # Used by #truncate_visible.  If +node+ is the first block element, and the
+  # text hasn't already been truncated, then append "..." to the node contents
+  # and return true.  Otherwise return false.
+  def truncate_if_block(node, truncated)
+    if node.element? && node.description.block? && !truncated
+      node.content = "#{node.content}..." if node.next_sibling
+      true
+    else
+      truncated
+    end
   end
 end

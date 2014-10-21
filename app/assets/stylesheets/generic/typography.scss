@@ -14,6 +14,7 @@ h2.page-title {
 
 h3.page-title {
   @include page-title;
+  font-size: 22px;
 }
 
 h6 {
@@ -39,15 +40,15 @@ a {
   outline: none;
   color: $link_color;
   &:hover {
-    text-decoration: none;
-    color: $primary_color;
+    text-decoration: underline;
+    color: $link_hover_color;
   }
 
   &:focus {
     text-decoration: underline;
   }
 
-  &.dark {
+  &.darken {
     color: $style_color;
   }
 
@@ -87,6 +88,8 @@ a:focus {
  */
 .wiki {
   @include md-typography;
+
+  word-wrap: break-word;
 
   /* Link to current header. */
   h1, h2, h3, h4, h5, h6 {

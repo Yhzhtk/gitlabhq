@@ -8,60 +8,52 @@
  */
 
 .issue-box {
-  color: #666;
+  color: #555;
   margin:20px 0;
-  background: #FFF;
-  border: 1px solid #EEE;
+  background: $box_bg;
+  @include box-shadow(0 1px 1px rgba(0, 0, 0, 0.09));
 
   &.issue-box-closed {
-    border-color: #DA4E49;
     .state {
-      background-color: #f2dede;
-      border-color: #ebccd1;
-      color: #a94442;
-      .state-label {
-        background: #DA4E49;
-        color: #FFF;
-      }
+      background-color: #F3CECE;
+      border-color: $border_danger;
+    }
+    .state-label {
+      background-color: $bg_danger;
+      color: #FFF;
     }
   }
 
   &.issue-box-merged {
-    border-color: #31708f;
     .state {
-      background-color: #d9edf7;
-      border-color: #bce8f1;
-      color: #31708f;
-      .state-label {
-        background: #31708f;
-        color: #FFF;
-      }
+      background-color: #B7CEE7;
+      border-color: $border_primary;
+    }
+    .state-label {
+      background-color: $bg_primary;
+      color: #FFF;
     }
   }
 
   &.issue-box-open {
-    border-color: #4A4;
     .state {
-      background-color: #dff0d8;
-      border-color: #d6e9c6;
-      color: #3c763d;
-      .state-label {
-        background: #4A4;
-        color: #FFF;
-      }
+      background-color: #D6F1D7;
+      border-color: $bg_success;
+    }
+    .state-label {
+      background-color: $bg_success;
+      color: #FFF;
     }
   }
 
   &.issue-box-expired {
-    border-color: #cea61b;
     .state {
-      background-color: #fcf8e3;
+      background-color: #EEE9B3;
       border-color: #faebcc;
-      color: #8a6d3b;
-      .state-label {
-        background: #cea61b;
-        color: #FFF;
-      }
+    }
+    .state-label {
+      background: #cea61b;
+      color: #FFF;
     }
   }
 
@@ -70,29 +62,42 @@
   }
 
   .state {
-    height: 34px;
-    border-bottom: 1px solid #DDD;
-    line-height: 32px;
+    background-color: #f9f9f9;
   }
 
   .title {
-    font-size: 22px;
-    font-weight: 500;
+    font-size: 28px;
+    font-weight: normal;
     line-height: 1.5;
     margin: 0;
     color: #333;
-    padding-bottom: 0;
-    padding: 15px 25px;
+    padding: 10px 15px;
   }
 
   .context {
     border: none;
     border-top: 1px solid #eee;
-    padding: 15px 25px;
+    padding: 10px 15px;
+
+    // Reset text align for children
+    .text-right > * { text-align: left; }
+
+    @media (max-width: $screen-xs-max) {
+      // Don't right align on mobile
+      .text-right { text-align: left; }
+
+      .row .col-md-6 {
+        padding-top: 5px;
+      }
+    }
   }
 
   .description {
-    padding: 0 25px 15px 25px;
+    padding: 0 15px 10px 15px;
+
+    code {
+      white-space: pre-wrap;
+    }
   }
 
   .title, .context, .description {
@@ -103,10 +108,16 @@
 
   .state-label {
     font-size: 14px;
-    padding: 1px 25px;
-    text-align: center;
-    text-shadow: none;
-    margin-right: 20px;
-    display: inline-block;
+    float: left;
+    font-weight: bold;
+    padding: 10px 15px;
+  }
+
+  .creator {
+    float: right;
+    padding: 10px 15px;
+    a {
+      text-decoration: underline;
+    }
   }
 }

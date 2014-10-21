@@ -10,8 +10,13 @@ module API
             error!(errors[:project_access], 422)
           elsif errors[:branch_conflict].any?
             error!(errors[:branch_conflict], 422)
+          elsif errors[:validate_fork].any?
+            error!(errors[:validate_fork], 422)
+          elsif errors[:validate_branches].any?
+            conflict!(errors[:validate_branches])
           end
-          not_found!
+
+          render_api_error!(errors, 400)
         end
       end
 
@@ -25,6 +30,10 @@ module API
       #   GET /projects/:id/merge_requests
       #   GET /projects/:id/merge_requests?state=opened
       #   GET /projects/:id/merge_requests?state=closed
+      #   GET /projects/:id/merge_requests?order_by=created_at
+      #   GET /projects/:id/merge_requests?order_by=updated_at
+      #   GET /projects/:id/merge_requests?sort=desc
+      #   GET /projects/:id/merge_requests?sort=asc
       #
       get ":id/merge_requests" do
         authorize! :read_merge_request, user_project
@@ -34,7 +43,17 @@ module API
               when "closed" then user_project.merge_requests.closed
               when "merged" then user_project.merge_requests.merged
               else user_project.merge_requests
-        end
+              end
+
+        sort = case params["sort"]
+               when 'desc' then 'DESC'
+               else 'ASC'
+               end
+
+        mrs = case params["order_by"]
+              when 'updated_at' then mrs.order("updated_at #{sort}")
+              else  mrs.order("created_at #{sort}")
+              end
 
         present paginate(mrs), with: Entities::MergeRequest
       end
@@ -67,6 +86,7 @@ module API
       #   assignee_id              - Assignee user ID
       #   title (required)         - Title of MR
       #   description              - Description of MR
+      #   labels (optional)        - Labels for MR as a comma-separated list
       #
       # Example:
       #   POST /projects/:id/merge_requests
@@ -75,9 +95,20 @@ module API
         authorize! :write_merge_request, user_project
         required_attributes! [:source_branch, :target_branch, :title]
         attrs = attributes_for_keys [:source_branch, :target_branch, :assignee_id, :title, :target_project_id, :description]
+
+        # Validate label names in advance
+        if (errors = validate_label_params(params)).any?
+          render_api_error!({ labels: errors }, 400)
+        end
+
         merge_request = ::MergeRequests::CreateService.new(user_project, current_user, attrs).execute
 
         if merge_request.valid?
+          # Find or create labels and attach to issue
+          if params[:labels].present?
+            merge_request.add_labels_by_names(params[:labels].split(","))
+          end
+
           present merge_request, with: Entities::MergeRequest
         else
           handle_merge_request_errors! merge_request.errors
@@ -95,6 +126,7 @@ module API
       #   title                       - Title of MR
       #   state_event                 - Status of MR. (close|reopen|merge)
       #   description                 - Description of MR
+      #   labels (optional)           - Labels for a MR as a comma-separated list
       # Example:
       #   PUT /projects/:id/merge_request/:merge_request_id
       #
@@ -102,14 +134,69 @@ module API
         attrs = attributes_for_keys [:source_branch, :target_branch, :assignee_id, :title, :state_event, :description]
         merge_request = user_project.merge_requests.find(params[:merge_request_id])
         authorize! :modify_merge_request, merge_request
+
+        # Validate label names in advance
+        if (errors = validate_label_params(params)).any?
+          render_api_error!({ labels: errors }, 400)
+        end
+
         merge_request = ::MergeRequests::UpdateService.new(user_project, current_user, attrs).execute(merge_request)
 
         if merge_request.valid?
+          # Find or create labels and attach to issue
+          unless params[:labels].nil?
+            merge_request.remove_labels
+            merge_request.add_labels_by_names(params[:labels].split(","))
+          end
+
           present merge_request, with: Entities::MergeRequest
         else
           handle_merge_request_errors! merge_request.errors
         end
       end
+
+      # Merge MR
+      #
+      # Parameters:
+      #   id (required)               - The ID of a project
+      #   merge_request_id (required) - ID of MR
+      #   merge_commit_message (optional) - Custom merge commit message
+      # Example:
+      #   PUT /projects/:id/merge_request/:merge_request_id/merge
+      #
+      put ":id/merge_request/:merge_request_id/merge" do
+        merge_request = user_project.merge_requests.find(params[:merge_request_id])
+
+        action = if user_project.protected_branch?(merge_request.target_branch)
+                   :push_code_to_protected_branches
+                 else
+                   :push_code
+                 end
+
+        if can?(current_user, action, user_project)
+          if merge_request.unchecked?
+            merge_request.check_if_can_be_merged
+          end
+
+          if merge_request.open?
+            if merge_request.can_be_merged?
+              merge_request.automerge!(current_user, params[:merge_commit_message] || merge_request.merge_commit_message)
+              present merge_request, with: Entities::MergeRequest
+            else
+              render_api_error!('Branch cannot be merged', 405)
+            end
+          else
+            # Merge request can not be merged
+            # because it is already closed/merged
+            not_allowed!
+          end
+        else
+          # Merge request can not be merged
+          # because user dont have permissions to push into target branch
+          unauthorized!
+        end
+      end
+
 
       # Get a merge request's comments
       #
@@ -137,21 +224,18 @@ module API
       #   POST /projects/:id/merge_request/:merge_request_id/comments
       #
       post ":id/merge_request/:merge_request_id/comments" do
-        set_current_user_for_thread do
-          required_attributes! [:note]
+        required_attributes! [:note]
 
-          merge_request = user_project.merge_requests.find(params[:merge_request_id])
-          note = merge_request.notes.new(note: params[:note], project_id: user_project.id)
-          note.author = current_user
+        merge_request = user_project.merge_requests.find(params[:merge_request_id])
+        note = merge_request.notes.new(note: params[:note], project_id: user_project.id)
+        note.author = current_user
 
-          if note.save
-            present note, with: Entities::MRNote
-          else
-            not_found!
-          end
+        if note.save
+          present note, with: Entities::MRNote
+        else
+          render_validation_error!(note)
         end
       end
-
     end
   end
 end

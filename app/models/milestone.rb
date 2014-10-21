@@ -16,8 +16,6 @@
 class Milestone < ActiveRecord::Base
   include InternalId
 
-  attr_accessible :title, :description, :due_date, :state_event
-
   belongs_to :project
   has_many :issues
   has_many :merge_requests
@@ -25,6 +23,7 @@ class Milestone < ActiveRecord::Base
 
   scope :active, -> { with_state(:active) }
   scope :closed, -> { with_state(:closed) }
+  scope :of_projects, ->(ids) { where(project_id: ids) }
 
   validates :title, presence: true
   validates :project, presence: true

@@ -1,10 +1,10 @@
-class Dashboard
+class @Dashboard
   constructor: ->
     @initSidebarTab()
 
     $(".dash-filter").keyup ->
       terms = $(this).val()
-      uiBox = $(this).parents('.ui-box').first()
+      uiBox = $(this).parents('.panel').first()
       if terms == "" || terms == undefined
         uiBox.find(".dash-list li").show()
       else
@@ -28,6 +28,3 @@ class Dashboard
     # show tab from cookie
     sidebar_filter = $.cookie(key)
     $("#" + sidebar_filter).tab('show') if sidebar_filter
-
-
-@Dashboard = Dashboard

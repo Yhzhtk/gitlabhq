@@ -87,21 +87,10 @@ describe "Internal Project Access", feature: true  do
     it { should be_denied_for :visitor }
   end
 
-  describe "GET /:project_path/wall" do
-    subject { project_wall_path(project) }
-
-    it { should be_allowed_for master }
-    it { should be_allowed_for reporter }
-    it { should be_allowed_for :admin }
-    it { should be_allowed_for guest }
-    it { should be_allowed_for :user }
-    it { should be_denied_for :visitor }
-  end
-
   describe "GET /:project_path/blob" do
     before do
       commit = project.repository.commit
-      path = commit.tree.contents.select { |i| i.is_a?(Grit::Blob) }.first.name
+      path = '.gitignore'
       @blob_path = project_blob_path(project, File.join(commit.id, path))
     end
 
@@ -187,17 +176,6 @@ describe "Internal Project Access", feature: true  do
     it { should be_allowed_for :admin }
     it { should be_denied_for guest }
     it { should be_denied_for :user }
-    it { should be_denied_for :visitor }
-  end
-
-  describe "GET /:project_path/branches/recent" do
-    subject { recent_project_branches_path(project) }
-
-    it { should be_allowed_for master }
-    it { should be_allowed_for reporter }
-    it { should be_allowed_for :admin }
-    it { should be_allowed_for guest }
-    it { should be_allowed_for :user }
     it { should be_denied_for :visitor }
   end
 

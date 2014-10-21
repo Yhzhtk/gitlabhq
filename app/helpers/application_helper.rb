@@ -60,23 +60,21 @@ module ApplicationHelper
 
   def avatar_icon(user_email = '', size = nil)
     user = User.find_by(email: user_email)
-    if user && user.avatar.present?
-      user.avatar.url
+
+    if user
+      user.avatar_url(size) || default_avatar
     else
       gravatar_icon(user_email, size)
     end
   end
 
   def gravatar_icon(user_email = '', size = nil)
-    size = 40 if size.nil? || size <= 0
+    GravatarService.new.execute(user_email, size) ||
+      default_avatar
+  end
 
-    if !Gitlab.config.gravatar.enabled || user_email.blank?
-      '/assets/no_avatar.png'
-    else
-      gravatar_url = request.ssl? || gitlab_config.https ? Gitlab.config.gravatar.ssl_url : Gitlab.config.gravatar.plain_url
-      user_email.strip!
-      sprintf gravatar_url, hash: Digest::MD5.hexdigest(user_email.downcase), size: size
-    end
+  def default_avatar
+    image_path('no_avatar.png')
   end
 
   def last_commit(project)
@@ -153,12 +151,6 @@ module ApplicationHelper
     sanitize(str, tags: %w(a span))
   end
 
-  def image_url(source)
-    # prevent relative_root_path being added twice (it's part of root_url and path_to_image)
-    root_url.sub(/#{root_path}$/, path_to_image(source))
-  end
-
-  alias_method :url_to_image, :image_url
 
   def body_data_page
     path = controller.controller_path.split('/')
@@ -180,18 +172,13 @@ module ApplicationHelper
   def search_placeholder
     if @project && @project.persisted?
       "Search in this project"
+    elsif @snippet || @snippets || @show_snippets
+      'Search snippets'
     elsif @group && @group.persisted?
       "Search in this group"
     else
       "Search"
     end
-  end
-
-  def first_line(str)
-    lines = str.split("\n")
-    line = lines.first
-    line += "..." if lines.size > 1
-    line
   end
 
   def broadcast_message
@@ -223,12 +210,65 @@ module ApplicationHelper
   end
 
   def render_markup(file_name, file_content)
-    GitHub::Markup.render(file_name, file_content).html_safe
+    GitHub::Markup.render(file_name, file_content).
+      force_encoding(file_content.encoding).html_safe
+  rescue RuntimeError
+    simple_format(file_content)
   end
 
-  def spinner(text = nil)
-    content_tag :div, class: 'loading hide' do
-      content_tag(:i, nil, class: 'icon-spinner icon-spin') + text
+  def markup?(filename)
+    Gitlab::MarkdownHelper.markup?(filename)
+  end
+
+  def gitlab_markdown?(filename)
+    Gitlab::MarkdownHelper.gitlab_markdown?(filename)
+  end
+
+  def spinner(text = nil, visible = false)
+    css_class = "loading"
+    css_class << " hide" unless visible
+
+    content_tag :div, class: css_class do
+      content_tag(:i, nil, class: 'fa fa-spinner fa-spin') + text
     end
+  end
+
+  def link_to(name = nil, options = nil, html_options = nil, &block)
+    begin
+      uri = URI(options)
+      host = uri.host
+      absolute_uri = uri.absolute?
+    rescue URI::InvalidURIError, ArgumentError
+      host = nil
+      absolute_uri = nil
+    end
+
+    # Add "nofollow" only to external links
+    if host && host != Gitlab.config.gitlab.host && absolute_uri
+      if html_options
+        if html_options[:rel]
+          html_options[:rel] << " nofollow"
+        else
+          html_options.merge!(rel: "nofollow")
+        end
+      else
+        html_options = Hash.new
+        html_options[:rel] = "nofollow"
+      end
+    end
+
+    super
+  end
+
+  def escaped_autolink(text)
+    auto_link ERB::Util.html_escape(text), link: :urls
+  end
+
+  def promo_host
+    'about.gitlab.com'
+  end
+
+  def promo_url
+    'https://' + promo_host
   end
 end

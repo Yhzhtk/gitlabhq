@@ -1,4 +1,5 @@
-Feature: Help
+@dashboard
+Feature: Dashboard Help
   Background:
     Given I sign in as a user
     And I visit the "Rake Tasks" help page

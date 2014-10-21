@@ -1,4 +1,4 @@
-class MergeRequest
+class @MergeRequest
   constructor: (@opts) ->
     @initContextWidget()
     this.$el = $('.merge-request')
@@ -15,8 +15,10 @@ class MergeRequest
 
     modal = $('#modal_merge_info').modal(show: false)
 
-    disableButtonIfEmptyField '#merge_commit_message', '.accept_merge_request'
+    disableButtonIfEmptyField '#commit_message', '.accept_merge_request'
 
+    if $("a.btn-close").length
+      $("li.task-list-item input:checkbox").prop("disabled", false)
 
   # Local jQuery finder
   $: (selector) ->
@@ -40,10 +42,12 @@ class MergeRequest
     if @opts.ci_enable
       $.get @opts.url_to_ci_check, (data) =>
         this.showCiState data.status
+        if data.coverage
+          this.showCiCoverage data.coverage
       , 'json'
 
   bindEvents: ->
-    this.$('.nav-tabs').on 'click', 'a', (event) =>
+    this.$('.merge-request-tabs').on 'click', 'a', (event) =>
       a = $(event.currentTarget)
 
       href = a.attr('href')
@@ -51,7 +55,7 @@ class MergeRequest
 
       event.preventDefault()
 
-    this.$('.nav-tabs').on 'click', 'li', (event) =>
+    this.$('.merge-request-tabs').on 'click', 'li', (event) =>
       this.activateTab($(event.currentTarget).data('action'))
 
     this.$('.accept_merge_request').on 'click', ->
@@ -70,16 +74,23 @@ class MergeRequest
       this.$('.remove_source_branch_in_progress').hide()
       this.$('.remove_source_branch_widget.failed').show()
 
+    $(".task-list-item input:checkbox").on(
+      "click"
+      null
+      "merge_request"
+      updateTaskState
+    )
+
   activateTab: (action) ->
-    this.$('.nav-tabs li').removeClass 'active'
+    this.$('.merge-request-tabs li').removeClass 'active'
     this.$('.tab-content').hide()
     switch action
       when 'diffs'
-        this.$('.nav-tabs .diffs-tab').addClass 'active'
+        this.$('.merge-request-tabs .diffs-tab').addClass 'active'
         this.loadDiff() unless @diffs_loaded
         this.$('.diffs').show()
       else
-        this.$('.nav-tabs .notes-tab').addClass 'active'
+        this.$('.merge-request-tabs .notes-tab').addClass 'active'
         this.$('.notes').show()
 
   showState: (state) ->
@@ -94,25 +105,21 @@ class MergeRequest
     else
       $('.ci_widget.ci-error').show()
 
-    switch state
-      when "success"
-        $('.mr-state-widget').addClass("panel-success")
-      when "failed"
-        $('.mr-state-widget').addClass("panel-danger")
-      when "running", "pending"
-        $('.mr-state-widget').addClass("panel-warning")
-
-
+  showCiCoverage: (coverage) ->
+    cov_html = $('<span>')
+    cov_html.addClass('ci-coverage')
+    cov_html.text('Coverage ' + coverage + '%')
+    $('.ci_widget:visible').append(cov_html)
 
   loadDiff: (event) ->
     $.ajax
       type: 'GET'
-      url: this.$('.nav-tabs .diffs-tab a').attr('href')
+      url: this.$('.merge-request-tabs .diffs-tab a').attr('href')
       beforeSend: =>
-        this.$('.status').addClass 'loading'
+        this.$('.mr-loading-status .loading').show()
       complete: =>
         @diffs_loaded = true
-        this.$('.status').removeClass 'loading'
+        this.$('.mr-loading-status .loading').hide()
       success: (data) =>
         this.$(".diffs").html(data.html)
       dataType: 'json'
@@ -125,5 +132,3 @@ class MergeRequest
     this.$('.automerge_widget').hide()
     this.$('.merge-in-progress').hide()
     this.$('.automerge_widget.already_cannot_be_merged').show()
-
-this.MergeRequest = MergeRequest

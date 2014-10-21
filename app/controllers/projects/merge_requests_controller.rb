@@ -32,6 +32,9 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   end
 
   def show
+    @note_counts = Note.where(commit_id: @merge_request.commits.map(&:id)).
+        group(:commit_id).count
+
     respond_to do |format|
       format.html
       format.diff { render text: @merge_request.to_diff(current_user) }
@@ -41,15 +44,12 @@ class Projects::MergeRequestsController < Projects::ApplicationController
 
   def diffs
     @commit = @merge_request.last_commit
-
     @comments_allowed = @reply_allowed = true
-    @comments_target = {noteable_type: 'MergeRequest',
-                        noteable_id: @merge_request.id}
+    @comments_target = {
+      noteable_type: 'MergeRequest',
+      noteable_id: @merge_request.id
+    }
     @line_notes = @merge_request.notes.where("line_code is not null")
-
-    diff_line_count = Commit::diff_line_count(@merge_request.diffs)
-    @suppress_diff = Commit::diff_suppress?(@merge_request.diffs, diff_line_count) && !params[:force_show_diff]
-    @force_suppress_diff = Commit::diff_force_suppress?(@merge_request.diffs, diff_line_count)
 
     respond_to do |format|
       format.html
@@ -58,15 +58,22 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   end
 
   def new
-    @merge_request = MergeRequest.new(params[:merge_request])
-    @merge_request.source_project = @project unless @merge_request.source_project
-    @merge_request.target_project ||= (@project.forked_from_project || @project)
-    @target_branches = @merge_request.target_project.nil? ? [] : @merge_request.target_project.repository.branch_names
+    params[:merge_request] ||= ActionController::Parameters.new(source_project: @project)
+    @merge_request = MergeRequests::BuildService.new(project, current_user, merge_request_params).execute
 
-    @merge_request.target_branch ||= @merge_request.target_project.default_branch
+    @target_branches = if @merge_request.target_project
+                         @merge_request.target_project.repository.branch_names
+                       else
+                         []
+                       end
 
-    @source_project = @merge_request.source_project
-    @merge_request
+    @target_project = merge_request.target_project
+    @source_project = merge_request.source_project
+    @commits = @merge_request.compare_commits
+    @commit = @merge_request.compare_commits.last
+    @diffs = @merge_request.compare_diffs
+    @note_counts = Note.where(commit_id: @commits.map(&:id)).
+      group(:commit_id).count
   end
 
   def edit
@@ -77,10 +84,10 @@ class Projects::MergeRequestsController < Projects::ApplicationController
 
   def create
     @target_branches ||= []
-    @merge_request = MergeRequests::CreateService.new(project, current_user, params[:merge_request]).execute
+    @merge_request = MergeRequests::CreateService.new(project, current_user, merge_request_params).execute
 
     if @merge_request.valid?
-      redirect_to [@merge_request.target_project, @merge_request], notice: 'Merge request was successfully created.'
+      redirect_to project_merge_request_path(@merge_request.target_project, @merge_request), notice: 'Merge request was successfully created.'
     else
       @source_project = @merge_request.source_project
       @target_project = @merge_request.target_project
@@ -89,7 +96,7 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   end
 
   def update
-    @merge_request = MergeRequests::UpdateService.new(project, current_user, params[:merge_request]).execute(@merge_request)
+    @merge_request = MergeRequests::UpdateService.new(project, current_user, merge_request_params).execute(@merge_request)
 
     if @merge_request.valid?
       respond_to do |format|
@@ -108,8 +115,6 @@ class Projects::MergeRequestsController < Projects::ApplicationController
       @merge_request.check_if_can_be_merged
     end
     render json: {merge_status: @merge_request.merge_status_name}
-  rescue Gitlab::SatelliteNotExistError
-    render json: {merge_status: :no_satellite}
   end
 
   def automerge
@@ -117,7 +122,7 @@ class Projects::MergeRequestsController < Projects::ApplicationController
 
     if @merge_request.open? && @merge_request.can_be_merged?
       @merge_request.should_remove_source_branch = params[:should_remove_source_branch]
-      @merge_request.automerge!(current_user, params[:merge_commit_message])
+      @merge_request.automerge!(current_user, params[:commit_message])
       @status = true
     else
       @status = false
@@ -138,7 +143,6 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   def update_branches
     @target_project = selected_target_project
     @target_branches = @target_project.repository.branch_names
-    @target_branches
 
     respond_to do |format|
       format.js
@@ -146,8 +150,17 @@ class Projects::MergeRequestsController < Projects::ApplicationController
   end
 
   def ci_status
-    status = @merge_request.source_project.gitlab_ci_service.commit_status(merge_request.last_commit.sha)
-    response = {status: status}
+    ci_service = @merge_request.source_project.ci_service
+    status = ci_service.commit_status(merge_request.last_commit.sha)
+
+    if ci_service.respond_to?(:commit_coverage)
+      coverage = ci_service.commit_coverage(merge_request.last_commit.sha)
+    end
+
+    response = {
+      status: status,
+      coverage: coverage
+    }
 
     render json: response
   end
@@ -211,7 +224,6 @@ class Projects::MergeRequestsController < Projects::ApplicationController
     @merge_request_diff = @merge_request.merge_request_diff
     @allowed_to_merge = allowed_to_merge?
     @show_merge_controls = @merge_request.open? && @commits.any? && @allowed_to_merge
-    @allowed_to_remove_source_branch = allowed_to_remove_source_branch?
     @source_branch = @merge_request.source_project.repository.find_branch(@merge_request.source_branch).try(:name)
   end
 
@@ -224,11 +236,6 @@ class Projects::MergeRequestsController < Projects::ApplicationController
     render 'invalid'
   end
 
-  def allowed_to_remove_source_branch?
-    allowed_to_push_code?(@merge_request.source_project, @merge_request.source_branch) &&
-      !@merge_request.disallow_source_branch_removal?
-  end
-
   def allowed_to_push_code?(project, branch)
     action = if project.protected_branch?(branch)
                :push_code_to_protected_branches
@@ -237,5 +244,13 @@ class Projects::MergeRequestsController < Projects::ApplicationController
              end
 
     can?(current_user, action, project)
+  end
+
+  def merge_request_params
+    params.require(:merge_request).permit(
+      :title, :assignee_id, :source_project_id, :source_branch,
+      :target_project_id, :target_branch, :milestone_id,
+      :state_event, :description, :task_num, label_ids: []
+    )
   end
 end

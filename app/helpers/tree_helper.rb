@@ -21,34 +21,31 @@ module TreeHelper
     tree.html_safe
   end
 
+  def render_readme(readme)
+    if gitlab_markdown?(readme.name)
+      preserve(markdown(readme.data))
+    elsif markup?(readme.name)
+      render_markup(readme.name, readme.data)
+    else
+      simple_format(readme.data)
+    end
+  end
+
   # Return an image icon depending on the file type
   #
   # type - String type of the tree item; either 'folder' or 'file'
   def tree_icon(type)
-    image = type == 'folder' ? 'file_dir.png' : 'file_txt.png'
-    image_tag(image, size: '16x16')
+    icon_class = if type == 'folder'
+                   'fa fa-folder'
+                 else
+                   'fa fa-file-o'
+                 end
+
+    content_tag :i, nil, class: icon_class
   end
 
   def tree_hex_class(content)
     "file_#{hexdigest(content.name)}"
-  end
-
-  # Public: Determines if a given filename is compatible with GitHub::Markup.
-  #
-  # filename - Filename string to check
-  #
-  # Returns boolean
-  def markup?(filename)
-    filename.downcase.end_with?(*%w(.textile .rdoc .org .creole
-                                    .mediawiki .rst .adoc .asciidoc .pod))
-  end
-
-  def gitlab_markdown?(filename)
-    filename.downcase.end_with?(*%w(.mdown .md .markdown))
-  end
-
-  def plain_text_readme? filename
-    filename =~ /^README(.txt)?$/i
   end
 
   # Simple shortcut to File.join
@@ -83,12 +80,20 @@ module TreeHelper
     end
   end
 
-  def up_dir_path tree
+  def up_dir_path(tree)
     file = File.join(@path, "..")
     tree_join(@ref, file)
   end
 
   def leave_edit_message
     "Leave edit mode?\nAll unsaved changes will be lost."
+  end
+
+  def editing_preview_title(filename)
+    if Gitlab::MarkdownHelper.previewable?(filename)
+      'Preview'
+    else
+      'Diff'
+    end
   end
 end

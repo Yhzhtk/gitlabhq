@@ -2,11 +2,11 @@ module VisibilityLevelHelper
   def visibility_level_color(level)
     case level
     when Gitlab::VisibilityLevel::PRIVATE
-      'cgreen'
+      'vs-private'
     when Gitlab::VisibilityLevel::INTERNAL
-      'camber'
+      'vs-internal'
     when Gitlab::VisibilityLevel::PUBLIC
-      'cblue'
+      'vs-public'
     end
   end
 
@@ -21,6 +21,23 @@ module VisibilityLevelHelper
           haml_concat "any logged in user."
         when Gitlab::VisibilityLevel::PUBLIC
           haml_concat "The project can be cloned"
+          haml_concat "without any"
+          haml_concat "authentication."
+        end
+      end
+    end
+  end
+
+  def snippet_visibility_level_description(level)
+    capture_haml do
+      haml_tag :span do
+        case level
+        when Gitlab::VisibilityLevel::PRIVATE
+          haml_concat "The snippet is visible only for me"
+        when Gitlab::VisibilityLevel::INTERNAL
+          haml_concat "The snippet is visible for any logged in user."
+        when Gitlab::VisibilityLevel::PUBLIC
+          haml_concat "The snippet can be accessed"
           haml_concat "without any"
           haml_concat "authentication."
         end

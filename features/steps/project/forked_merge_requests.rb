@@ -1,4 +1,4 @@
-class ProjectForkedMergeRequests < Spinach::FeatureSteps
+class Spinach::Features::ProjectForkedMergeRequests < Spinach::FeatureSteps
   include SharedAuthentication
   include SharedProject
   include SharedNote
@@ -9,18 +9,11 @@ class ProjectForkedMergeRequests < Spinach::FeatureSteps
     @project = Project.find_by(name: "Shop")
     @project ||= create(:project, name: "Shop")
     @project.team << [@user, :reporter]
+    @project.ensure_satellite_exists
   end
 
   step 'I have a project forked off of "Shop" called "Forked Shop"' do
-    @forking_user = @user
-    forked_project_link = build(:forked_project_link)
-    @forked_project = Project.find_by(name: "Forked Shop")
-    @forked_project ||= create(:project, name: "Forked Shop", forked_project_link: forked_project_link, creator_id: @forking_user.id , namespace: @forking_user.namespace)
-
-    forked_project_link.forked_from_project = @project
-    forked_project_link.forked_to_project = @forked_project
-    @forked_project.team << [@forking_user , :master]
-    forked_project_link.save!
+    @forked_project = Projects::ForkService.new(@project, @user).execute
   end
 
   step 'I click link "New Merge Request"' do
@@ -33,8 +26,8 @@ class ProjectForkedMergeRequests < Spinach::FeatureSteps
     current_path.should == project_merge_request_path(@project, @merge_request)
     @merge_request.title.should == "Merge Request On Forked Project"
     @merge_request.source_project.should == @forked_project
-    @merge_request.source_branch.should == "master"
-    @merge_request.target_branch.should == "stable"
+    @merge_request.source_branch.should == "fix"
+    @merge_request.target_branch.should == "master"
     page.should have_content @forked_project.path_with_namespace
     page.should have_content @project.path_with_namespace
     page.should have_content @merge_request.source_branch
@@ -42,17 +35,12 @@ class ProjectForkedMergeRequests < Spinach::FeatureSteps
   end
 
   step 'I fill out a "Merge Request On Forked Project" merge request' do
-    select2 @forked_project.id, from: "#merge_request_source_project_id"
-    select2 @project.id, from: "#merge_request_target_project_id"
+    select @forked_project.path_with_namespace, from: "merge_request_source_project_id"
+    select @project.path_with_namespace, from: "merge_request_target_project_id"
+    select "fix", from: "merge_request_source_branch"
+    select "master", from: "merge_request_target_branch"
 
-    find(:select, "merge_request_source_project_id", {}).value.should == @forked_project.id.to_s
-    find(:select, "merge_request_target_project_id", {}).value.should == @project.id.to_s
-
-    select2 "master", from: "#merge_request_source_branch"
-    select2 "stable", from: "#merge_request_target_branch"
-
-    find(:select, "merge_request_source_branch", {}).value.should == 'master'
-    find(:select, "merge_request_target_branch", {}).value.should == 'stable'
+    click_button "Compare branches"
 
     fill_in "merge_request_title", with: "Merge Request On Forked Project"
   end
@@ -100,8 +88,8 @@ class ProjectForkedMergeRequests < Spinach::FeatureSteps
     @merge_request = @project.merge_requests.last
     current_path.should == project_merge_request_path(@project, @merge_request)
     @merge_request.source_project.should == @forked_project
-    @merge_request.source_branch.should == "master"
-    @merge_request.target_branch.should == "stable"
+    @merge_request.source_branch.should == "fix"
+    @merge_request.target_branch.should == "master"
     page.should have_content @forked_project.path_with_namespace
     page.should have_content @project.path_with_namespace
     page.should have_content @merge_request.source_branch
@@ -113,33 +101,6 @@ class ProjectForkedMergeRequests < Spinach::FeatureSteps
     page.should have_link "Create Merge Request"
   end
 
-  step 'project "Forked Shop" has push event' do
-    @forked_project = Project.find_by(name: "Forked Shop")
-
-    data = {
-      before: "0000000000000000000000000000000000000000",
-      after: "0220c11b9a3e6c69dc8fd35321254ca9a7b98f7e",
-      ref: "refs/heads/new_design",
-      user_id: @user.id,
-      user_name: @user.name,
-      repository: {
-        name: @forked_project.name,
-        url: "localhost/rubinius",
-        description: "",
-        homepage: "localhost/rubinius",
-        private: true
-      }
-    }
-
-    @event = Event.create(
-      project: @forked_project,
-      action: Event::PUSHED,
-      data: data,
-      author_id: @user.id
-    )
-  end
-
-
   step 'I click link edit "Merge Request On Forked Project"' do
     find("#edit_merge_request").click
   end
@@ -148,37 +109,23 @@ class ProjectForkedMergeRequests < Spinach::FeatureSteps
     current_path.should == edit_project_merge_request_path(@project, @merge_request)
     page.should have_content "Edit merge request ##{@merge_request.id}"
     find("#merge_request_title").value.should == "Merge Request On Forked Project"
-    find("#merge_request_source_project_id").value.should == @forked_project.id.to_s
-    find("#merge_request_target_project_id").value.should == @project.id.to_s
-    find("#merge_request_source_branch").value.should have_content "master"
-    verify_commit_link(".mr_source_commit",@forked_project)
-    find("#merge_request_target_branch").value.should have_content "stable"
-    verify_commit_link(".mr_target_commit",@project)
   end
 
   step 'I fill out an invalid "Merge Request On Forked Project" merge request' do
-    #If this isn't filled in the rest of the validations won't be triggered
-    fill_in "merge_request_title", with: "Merge Request On Forked Project"
-
     select "Select branch", from: "merge_request_target_branch"
-
     find(:select, "merge_request_source_project_id", {}).value.should == @forked_project.id.to_s
     find(:select, "merge_request_target_project_id", {}).value.should == project.id.to_s
     find(:select, "merge_request_source_branch", {}).value.should == ""
     find(:select, "merge_request_target_branch", {}).value.should == ""
+    click_button "Compare branches"
   end
 
   step 'I should see validation errors' do
-    page.should have_content "Source branch can't be blank"
-    page.should have_content "Target branch can't be blank"
+    page.should have_content "You must select source and target branch"
   end
 
   step 'the target repository should be the original repository' do
     page.should have_select("merge_request_target_project_id", selected: project.path_with_namespace)
-  end
-
-  def project
-    @project ||= Project.find_by!(name: "Shop")
   end
 
   # Verify a link is generated against the correct project

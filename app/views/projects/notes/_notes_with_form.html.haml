@@ -1,4 +1,4 @@
-%ul#notes-list.notes.main-notes-list
+%ul#notes-list.notes.main-notes-list.timeline
   = render "projects/notes/notes"
 .js-notes-busy
 
@@ -7,4 +7,4 @@
   = render "projects/notes/form"
 
 :javascript
-  new Notes("#{project_notes_path(target_id: @noteable.id, target_type: @noteable.class.name.underscore)}", #{@notes.map(&:id).to_json})
+  new Notes("#{project_notes_path(target_id: @noteable.id, target_type: @noteable.class.name.underscore)}", #{@notes.map(&:id).to_json}, #{Time.now.to_i})

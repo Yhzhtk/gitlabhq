@@ -1,3 +1,211 @@
+v 7.4.0
+  - Refactored membership logic
+  - Improve error reporting on users API (Julien Bianchi)
+  - Refactor test coverage tools usage. Use SIMPLECOV=true to generate it locally
+  - Default branch is protected by default
+  - Increase unicorn timeout to 60 seconds
+  - Sort search autocomplete projects by stars count so most popular go first
+  - Add README to tab on project show page
+  - Do not delete tmp/repositories itself during clean-up, only its contents
+  - Support for backup uploads to remote storage
+  - Prevent notes polling when there are not notes
+  - API: Add support for forking a project via the API (Bernhard Kaindl)
+  - API: filter project issues by milestone (Julien Bianchi)
+  - Fail harder in the backup script
+  - Changes to Slack service structure, only webhook url needed
+  - Zen mode for wiki and milestones (Robert Schilling)
+  - Move Emoji parsing to html-pipeline-gitlab (Robert Schilling)
+  - Font Awesome 4.2 integration (Sullivan Senechal)
+  - Add Pushover service integration (Sullivan Senechal)
+  - Add select field type for services options (Sullivan Senechal)
+  - Add cross-project references to the Markdown parser (Vinnie Okada)
+  - Add task lists to issue and merge request descriptions (Vinnie Okada)
+  - Snippets can be public, internal or private
+  - Improve danger zone: ask project path to confirm data-loss action
+  - Raise exception on forgery
+  - Show build coverage in Merge Requests (requires GitLab CI v5.1)
+  - New milestone and label links on issue edit form
+  - Improved repository graphs
+  - Improve event note display in dashboard and project activity views (Vinnie Okada)
+  - Add users sorting to admin area
+  - UI improvements
+  - Fix ambiguous sha problem with mentioned commit
+  - Fixed bug with apostrophe when at mentioning users
+  - Add active directory ldap option
+  - Developers can push to wiki repo. Protected branches does not affect wiki repo any more 
+  - Faster rev list
+  - Fix branch removal
+
+v 7.3.2
+  - Fix creating new file via web editor
+  - Use gitlab-shell v2.0.1
+
+v 7.3.1
+  - Fix ref parsing in Gitlab::GitAccess
+  - Fix error 500 when viewing diff on a file with changed permissions
+  - Fix adding comments to MR when source branch is master
+  - Fix error 500 when searching description contains relative link
+
+v 7.3.0
+  - Always set the 'origin' remote in satellite actions
+  - Write authorized_keys in tmp/ during tests
+  - Use sockets to connect to Redis
+  - Add dormant New Relic gem (can be enabled via environment variables)
+  - Expire Rack sessions after 1 week
+  - Cleaner signin/signup pages
+  - Improved comments UI
+  - Better search with filtering, pagination etc
+  - Added a checkbox to toggle line wrapping in diff (Yuriy Glukhov)
+  - Prevent project stars duplication when fork project
+  - Use the default Unicorn socket backlog value of 1024
+  - Support Unix domain sockets for Redis
+  - Store session Redis keys in 'session:gitlab:' namespace
+  - Deprecate LDAP account takeover based on partial LDAP email / GitLab username match
+  - Use /bin/sh instead of Bash in bin/web, bin/background_jobs (Pavel Novitskiy)
+  - Keyboard shortcuts for productivity (Robert Schilling)
+  - API: filter issues by state (Julien Bianchi)
+  - API: filter issues by labels (Julien Bianchi)
+  - Add system hook for ssh key changes
+  - Add blob permalink link (Ciro Santilli)
+  - Create annotated tags through UI and API (Sean Edge)
+  - Snippets search (Charles Bushong)
+  - Comment new push to existing MR
+  - Add 'ci' to the blacklist of forbidden names
+  - Improve text filtering on issues page
+  - Comment & Close button
+  - Process git push --all much faster
+  - Don't allow edit of system notes
+  - Project wiki search (Ralf Seidler)
+  - Enabled Shibboleth authentication support (Matus Banas)
+  - Zen mode (fullscreen) for issues/MR/notes (Robert Schilling)
+  - Add ability to configure webhook timeout via gitlab.yml (Wes Gurney)
+  - Sort project merge requests in asc or desc order for updated_at or created_at field (sponsored by O'Reilly Media)
+  - Add Redis socket support to 'rake gitlab:shell:install'
+
+v 7.2.1
+  - Delete orphaned labels during label migration (James Brooks)
+  - Security: prevent XSS with stricter MIME types for raw repo files
+
+v 7.2.0
+  - Explore page
+  - Add project stars (Ciro Santilli)
+  - Log Sidekiq arguments
+  - Better labels: colors, ability to rename and remove
+  - Improve the way merge request collects diffs
+  - Improve compare page for large diffs
+  - Expose the full commit message via API
+  - Fix 500 error on repository rename
+  - Fix bug when MR download patch return invalid diff
+  - Test gitlab-shell integration
+  - Repository import timeout increased from 2 to 4 minutes allowing larger repos to be imported
+  - API for labels (Robert Schilling)
+  - API: ability to set an import url when creating project for specific user
+
+v 7.1.1
+  - Fix cpu usage issue in Firefox
+  - Fix redirect loop when changing password by new user
+  - Fix 500 error on new merge request page
+
+v 7.1.0
+  - Remove observers
+  - Improve MR discussions
+  - Filter by description on Issues#index page
+  - Fix bug with namespace select when create new project page
+  - Show README link after description for non-master members
+  - Add @all mention for comments
+  - Dont show reply button if user is not signed in
+  - Expose more information for issues with webhook
+  - Add a mention of the merge request into the default merge request commit message
+  - Improve code highlight, introduce support for more languages like Go, Clojure, Erlang etc
+  - Fix concurrency issue in repository download
+  - Dont allow repository name start with ?
+  - Improve email threading (Pierre de La Morinerie)
+  - Cleaner help page
+  - Group milestones
+  - Improved email notifications
+  - Contributors API (sponsored by Mobbr)
+  - Fix LDAP TLS authentication (Boris HUISGEN)
+  - Show VERSION information on project sidebar
+  - Improve branch removal logic when accept MR
+  - Fix bug where comment form is spawned inside the Reply button
+  - Remove Dir.chdir from Satellite#lock for thread-safety
+  - Increased default git max_size value from 5MB to 20MB in gitlab.yml. Please update your configs!
+  - Show error message in case of timeout in satellite when create MR
+  - Show first 100 files for huge diff instead of hiding all
+  - Change default admin email from admin@local.host to admin@example.com
+
+v 7.0.0
+  - The CPU no longer overheats when you hold down the spacebar
+  - Improve edit file UI
+  - Add ability to upload group avatar when create
+  - Protected branch cannot be removed
+  - Developers can remove normal branches with UI
+  - Remove branch via API (sponsored by O'Reilly Media)
+  - Move protected branches page to Project settings area
+  - Redirect to Files view when create new branch via UI
+  - Drag and drop upload of image in every markdown-area (Earle Randolph Bunao and Neil Francis Calabroso)
+  - Refactor the markdown relative links processing
+  - Make it easier to implement other CI services for GitLab
+  - Group masters can create projects in group
+  - Deprecate ruby 1.9.3 support
+  - Only masters can rewrite/remove git tags
+  - Add X-Frame-Options SAMEORIGIN to Nginx config so Sidekiq admin is visible
+  - UI improvements
+  - Case-insensetive search for issues
+  - Update to rails 4.1
+  - Improve performance of application for projects and groups with a lot of members
+  - Formally support Ruby 2.1
+  - Include Nginx gitlab-ssl config
+  - Add manual language detection for highlight.js
+  - Added example.com/:username routing
+  - Show notice if your profile is public
+  - UI improvements for mobile devices
+  - Improve diff rendering performance
+  - Drag-n-drop for issues and merge requests between states at milestone page
+  - Fix '0 commits' message for huge repositories on project home page
+  - Prevent 500 error page when visit commit page from large repo
+  - Add notice about huge push over http to unicorn config
+  - File action in satellites uses default 30 seconds timeout instead of old 10 seconds one
+  - Overall performance improvements
+  - Skip init script check on omnibus-gitlab
+  - Be more selective when killing stray Sidekiqs
+  - Check LDAP user filter during sign-in
+  - Remove wall feature (no data loss - you can take it from database)
+  - Dont expose user emails via API unless you are admin
+  - Detect issues closed by Merge Request description
+  - Better email subject lines from email on push service (Alex Elman)
+  - Enable identicon for gravatar be default
+
+v 6.9.2
+  - Revert the commit that broke the LDAP user filter
+
+v 6.9.1
+  - Fix scroll to highlighted line
+  - Fix the pagination on load for commits page
+
+v 6.9.0
+  - Store Rails cache data in the Redis `cache:gitlab` namespace
+  - Adjust MySQL limits for existing installations
+  - Add db index on project_id+iid column. This prevents duplicate on iid (During migration duplicates will be removed)
+  - Markdown preview or diff during editing via web editor (Evgeniy Sokovikov)
+  - Give the Rails cache its own Redis namespace
+  - Add ability to set different ssh host, if different from http/https
+  - Fix syntax highlighting for code comments blocks
+  - Improve comments loading logic
+  - Stop refreshing comments when the tab is hidden
+  - Improve issue and merge request mobile UI (Drew Blessing)
+  - Document how to convert a backup to PostgreSQL
+  - Fix locale bug in backup manager
+  - Fix can not automerge when MR description is too long
+  - Fix wiki backup skip bug
+  - Two Step MR creation process
+  - Remove unwanted files from satellite working directory with git clean -fdx
+  - Accept merge request via API (sponsored by O'Reilly Media)
+  - Add more access checks during API calls
+  - Block SSH access for 'disabled' Active Directory users
+  - Labels for merge requests (Drew Blessing)
+  - Threaded emails by setting a Message-ID (Philip Blatter)
+
 v 6.8.0
   - Ability to at mention users that are participating in issue and merge req. discussion
   - Enabled GZip Compression for assets in example Nginx, make sure that Nginx is compiled with --with-http_gzip_static_module flag (this is default in Ubuntu)
@@ -38,7 +246,7 @@ v 6.7.0
   - Blob and tree gfm links to anchors work
   - Piwik Integration (Sebastian Winkler)
   - Show contribution guide link for new issue form (Jeroen van Baarsen)
-  - Fix CI status for merge requests from fork 
+  - Fix CI status for merge requests from fork
   - Added option to remove issue assignee on project issue page and issue edit page (Jason Blanchard)
   - New page load indicator that includes a spinner that scrolls with the page
   - Converted all the help sections into markdown
@@ -229,7 +437,7 @@ v 6.2.0
   - Store the sessions in Redis instead of the cookie store
   - Fixed relative links in markdown
   - User must confirm their email if signup enabled
-  - User must confirm changed email 
+  - User must confirm changed email
 
 v 6.1.0
   - Project specific IDs for issues, mr, milestones

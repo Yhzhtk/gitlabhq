@@ -5,7 +5,7 @@
   %p.light
     Members of group have access to all group projects.
     Read more about permissions
-    %strong= link_to "here", help_permissions_path, class: "vlink"
+    %strong= link_to "here", help_page_path("permissions", "permissions"), class: "vlink"
 
 %hr
 
@@ -19,20 +19,20 @@
     .pull-right
       = link_to '#', class: 'btn btn-new js-toggle-button' do
         Add members
-        %i.icon-chevron-down
+        %i.fa.fa-chevron-down
 
     .js-toggle-content.hide.new-group-member-holder
       = render "new_group_member"
 
-.ui-box.prepend-top-20
-  .title
+.panel.panel-default.prepend-top-20
+  .panel-heading
     %strong #{@group.name}
     group members
     %small
       (#{@members.total_count})
   %ul.well-list
     - @members.each do |member|
-      = render 'users_groups/users_group', member: member, show_roles: show_roles, show_controls: true
+      = render 'groups/group_members/group_member', member: member, show_roles: show_roles, show_controls: true
 = paginate @members, theme: 'gitlab'
 
 :coffeescript
