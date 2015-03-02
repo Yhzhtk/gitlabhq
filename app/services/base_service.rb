@@ -1,4 +1,6 @@
 class BaseService
+  include Gitlab::CurrentSettings
+
   attr_accessor :project, :current_user, :params
 
   def initialize(project, user, params = {})
@@ -6,11 +8,7 @@ class BaseService
   end
 
   def abilities
-    @abilities ||= begin
-                     abilities = Six.new
-                     abilities << Ability
-                     abilities
-                   end
+    Ability.abilities
   end
 
   def can?(object, action, subject)
@@ -33,13 +31,20 @@ class BaseService
     SystemHooksService.new
   end
 
+  def current_application_settings
+    ApplicationSetting.current
+  end
+
   private
 
-  def error(message)
-    {
+  def error(message, http_status = nil)
+    result = {
       message: message,
       status: :error
     }
+
+    result[:http_status] = http_status if http_status
+    result
   end
 
   def success

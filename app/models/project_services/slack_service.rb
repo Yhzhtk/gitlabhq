@@ -5,11 +5,12 @@
 #  id         :integer          not null, primary key
 #  type       :string(255)
 #  title      :string(255)
-#  project_id :integer          not null
+#  project_id :integer
 #  created_at :datetime
 #  updated_at :datetime
 #  active     :boolean          default(FALSE), not null
 #  properties :text
+#  template   :boolean          default(FALSE)
 #
 
 class SlackService < Service
@@ -30,23 +31,20 @@ class SlackService < Service
 
   def fields
     [
-      { type: 'text', name: 'webhook', placeholder: '' }
+      { type: 'text', name: 'webhook', placeholder: 'https://hooks.slack.com/services/...' }
     ]
   end
 
   def execute(push_data)
+    return unless webhook.present?
+
     message = SlackMessage.new(push_data.merge(
       project_url: project_url,
       project_name: project_name
     ))
 
-    credentials = webhook.match(/(\w*).slack.com.*services\/(.*)/)
-    if credentials.present?
-      subdomain =  credentials[1]
-      token = credentials[2].split("token=").last
-      notifier = Slack::Notifier.new(subdomain, token)
-      notifier.ping(message.pretext, attachments: message.attachments)
-    end
+    notifier = Slack::Notifier.new(webhook)
+    notifier.ping(message.pretext, attachments: message.attachments)
   end
 
   private

@@ -10,7 +10,7 @@ class Projects::TeamMembersController < Projects::ApplicationController
   end
 
   def new
-    @user_project_relation = project.project_members.new
+    @user_project_relation = @project.project_members.new
   end
 
   def create
@@ -21,32 +21,36 @@ class Projects::TeamMembersController < Projects::ApplicationController
     if params[:redirect_to]
       redirect_to params[:redirect_to]
     else
-      redirect_to project_team_index_path(@project)
+      redirect_to namespace_project_team_index_path(@project.namespace,
+                                                    @project)
     end
   end
 
   def update
-    @user_project_relation = project.project_members.find_by(user_id: member)
+    @user_project_relation = @project.project_members.find_by(user_id: member)
     @user_project_relation.update_attributes(member_params)
 
     unless @user_project_relation.valid?
       flash[:alert] = "User should have at least one role"
     end
-    redirect_to project_team_index_path(@project)
+    redirect_to namespace_project_team_index_path(@project.namespace, @project)
   end
 
   def destroy
-    @user_project_relation = project.project_members.find_by(user_id: member)
+    @user_project_relation = @project.project_members.find_by(user_id: member)
     @user_project_relation.destroy
 
     respond_to do |format|
-      format.html { redirect_to project_team_index_path(@project) }
+      format.html do
+        redirect_to namespace_project_team_index_path(@project.namespace,
+                                                      @project)
+      end
       format.js { render nothing: true }
     end
   end
 
   def leave
-    project.project_members.find_by(user_id: current_user).destroy
+    @project.project_members.find_by(user_id: current_user).destroy
 
     respond_to do |format|
       format.html { redirect_to :back }
@@ -59,7 +63,8 @@ class Projects::TeamMembersController < Projects::ApplicationController
     status = @project.team.import(giver)
     notice = status ? "Successfully imported" : "Import failed"
 
-    redirect_to project_team_index_path(project), notice: notice
+    redirect_to(namespace_project_team_index_path(project.namespace, project),
+                notice: notice)
   end
 
   protected

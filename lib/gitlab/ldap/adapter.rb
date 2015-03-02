@@ -22,7 +22,7 @@ module Gitlab
         Gitlab::LDAP::Config.new(provider)
       end
 
-      def users(field, value)
+      def users(field, value, limit = nil)
         if field.to_sym == :dn
           options = {
             base: value,
@@ -45,6 +45,10 @@ module Gitlab
                              end
         end
 
+        if limit.present?
+          options.merge!(size: limit)
+        end
+
         entries = ldap_search(options).select do |entry|
           entry.respond_to? config.uid
         end
@@ -59,8 +63,10 @@ module Gitlab
       end
 
       def dn_matches_filter?(dn, filter)
-        ldap_search(base: dn, filter: filter,
-          scope: Net::LDAP::SearchScope_BaseObject, attributes: %w{dn}).any?
+        ldap_search(base: dn,
+                    filter: filter,
+                    scope: Net::LDAP::SearchScope_BaseObject,
+                    attributes: %w{dn}).any?
       end
 
       def ldap_search(*args)

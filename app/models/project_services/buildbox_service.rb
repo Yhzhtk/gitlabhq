@@ -5,12 +5,14 @@
 #  id         :integer          not null, primary key
 #  type       :string(255)
 #  title      :string(255)
-#  project_id :integer          not null
+#  project_id :integer
 #  created_at :datetime
 #  updated_at :datetime
 #  active     :boolean          default(FALSE), not null
 #  properties :text
+#  template   :boolean          default(FALSE)
 #
+require "addressable/uri"
 
 class BuildboxService < CiService
   prop_accessor :project_url, :token
